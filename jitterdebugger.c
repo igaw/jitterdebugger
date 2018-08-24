@@ -78,6 +78,7 @@ struct stats {
 
 static int shutdown;
 static unsigned int num_threads;
+static unsigned int priority = 80;
 
 static void err_handler(int error, char *msg)
 {
@@ -260,7 +261,7 @@ static void *worker(void *arg)
 	return NULL;
 }
 
-static void create_workers(struct stats *s, unsigned int priority)
+static void create_workers(struct stats *s)
 {
 	struct sched_param sched;
 	pthread_attr_t attr;
@@ -341,7 +342,6 @@ int main(int argc, char *argv[])
 	/* Command line options */
 	char *filename = NULL;
 	FILE *stream = NULL;
-	int priority = 80;
 	int verbose = 0;
 
 	while (1) {
@@ -422,7 +422,7 @@ int main(int argc, char *argv[])
 	if (!s)
 		err_handler(errno, "calloc()");
 
-	create_workers(s, priority);
+	create_workers(s);
 
 	if (verbose) {
 		err = pthread_create(&pid, NULL, display_stats, s);
