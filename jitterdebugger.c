@@ -41,8 +41,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
 #include <sched.h>
+#include <linux/limits.h>
 
 #define VT100_ERASE_EOL		"\033[K"
 #define VT100_CURSOR_UP		"\033[%dA"
@@ -79,6 +79,9 @@ struct stats {
 static int shutdown;
 static unsigned int num_threads;
 static unsigned int priority = 80;
+static unsigned int break_val = UINT_MAX;
+static int trace_fd = -1;
+static int tracemark_fd = -1;
 
 static void err_handler(int error, char *msg)
 {
@@ -138,6 +141,30 @@ static void c_states_enable(int fd)
 {
 	/* By closing the fd, the PM settings are restored. */
 	close(fd);
+}
+
+static void open_trace_fds(void)
+{
+	const char *tracing_on = "/sys/kernel/debug/tracing/tracing_on";
+	const char *trace_marker = "/sys/kernel/debug/tracing/trace_marker";
+
+	trace_fd = TEMP_FAILURE_RETRY(open(tracing_on, O_WRONLY));
+	if (trace_fd < 0)
+		err_handler(errno, "open()");
+
+	tracemark_fd = TEMP_FAILURE_RETRY(open(trace_marker, O_WRONLY));
+	if (tracemark_fd < 0)
+		err_handler(errno, "open()");
+}
+
+static void stop_tracer(uint64_t diff)
+{
+	char buf[128];
+	int len;
+
+	len = snprintf(buf, 128, "Hit latency %lu", diff);
+	write(tracemark_fd, buf, len);
+	write(trace_fd, "0\n", 2);
 }
 
 static pid_t gettid(void)
@@ -256,6 +283,11 @@ static void *worker(void *arg)
 
 		if (diff < s->hist_size)
 			s->hist[diff]++;
+
+		if (diff > break_val) {
+			stop_tracer(diff);
+			WRITE_ONCE(shutdown, 1);
+		}
 	}
 
 	return NULL;
@@ -315,17 +347,20 @@ static struct option long_options[] = {
 	{ "verbose",	no_argument,		0,    'v' },
 	{ "file",	required_argument,	0,    'f' },
 	{ "priority",	required_argument,	0,    'p' },
+	{ "break",	required_argument,	0,    'b' },
 	{ 0, },
 };
 
 static void usage(void)
 {
-	printf("jitterdebugger [-fp]\n");
+	printf("jitterdebugger [-fpb]\n");
 	printf("\n");
 	printf("Usage:\n");
 	printf("  --verbose, -v		Print live statistics\n");
 	printf("  --file FILE, -f	Store output into FILE\n");
 	printf("  --priority PRI, -p	Set worker thread priority. [1..98]\n");
+	printf("  --break VALUE, -b	Stop if max latency exceeds VALUE.\n");
+	printf("			Also the tracers\n");
 	printf("  --help, -h		Print this help\n");
 }
 
@@ -345,7 +380,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vh", long_options, NULL);
+		c = getopt_long(argc, argv, "f:p:vb:h", long_options, NULL);
 		if (c < 0)
 			break;
 
@@ -364,15 +399,32 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "No digits found\n");
 				exit(1);
 			}
-			priority = val;
 
-			if (priority < 1 || priority > 98) {
+			if (val < 1 || val > 98) {
 				fprintf(stderr, "Invalid value for priority. Valid range is [1..98]\n");
 				exit(1);
 			}
+			priority = val;
 			break;
 		case 'v':
 			verbose = 1;
+			break;
+		case 'b':
+			val = strtol(optarg, &endptr, 10);
+			if ((errno == ERANGE &&	(val == LONG_MAX || val == LONG_MIN))
+					|| (errno != 0 && val == 0)) {
+				err_handler(errno, "strtol()");
+			}
+			if (endptr == optarg) {
+				fprintf(stderr, "No digits found\n");
+				exit(1);
+			}
+
+			if (val < 0) {
+				fprintf(stderr, "Invalid value for break. Valid range is [1..]\n");
+				exit(1);
+			}
+			break_val = val;
 			break;
 		case 'h':
 			usage();
@@ -408,6 +460,9 @@ int main(int argc, char *argv[])
 	}
 
 	fd = c_states_disable();
+
+	if (break_val != UINT_MAX)
+		open_trace_fds();
 
 	num_threads = get_nprocs();
 	if (num_threads > CPU_SETSIZE) {
@@ -455,12 +510,26 @@ int main(int argc, char *argv[])
 
 	dump_stats(stream, s);
 
+	if (verbose && break_val != UINT_MAX) {
+		for (i = 0; i < num_threads; i++) {
+			if (s[i].max > break_val)
+				printf("Thread %ld on CPU %d hit %u us latency\n",
+					(long)s[i].tid, i, s[i].max);
+		}
+	}
+
 	if (stream != stdout)
 		fclose(stream);
 
 	for (i = 0; i < num_threads; i++)
 		free(s[i].hist);
 	free(s);
+
+	if (tracemark_fd > 0)
+		close(trace_fd);
+
+	if (trace_fd > 0)
+		close(trace_fd);
 
 	c_states_enable(fd);
 
