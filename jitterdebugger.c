@@ -370,6 +370,7 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "Invalid value for priority. Valid range is [1..98]\n");
 				exit(1);
 			}
+			break;
 		case 'v':
 			verbose = 1;
 			break;
