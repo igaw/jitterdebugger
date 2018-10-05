@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall -lpthread -O3
+CFLAGS=-g -Wall -pthread -O3
 
 jitterdebugger: jitterdebugger.c
 
