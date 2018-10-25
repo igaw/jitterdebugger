@@ -42,6 +42,12 @@
 	__u.__v;							\
 })
 
+struct latency_sample {
+	uint32_t cpuid;
+	struct timespec ts;
+	uint64_t val;
+} __attribute__((packed));
+
 struct ringbuffer;
 
 struct ringbuffer *ringbuffer_create(unsigned int size);

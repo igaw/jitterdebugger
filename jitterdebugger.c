@@ -62,6 +62,7 @@ struct stats {
 	uint64_t *hist;		/* each slot is one us */
 	uint64_t total;
 	uint64_t count;
+	struct ringbuffer *rb;
 };
 
 static int shutdown;
@@ -70,7 +71,7 @@ static unsigned int priority = 80;
 static unsigned int break_val = UINT_MAX;
 static int trace_fd = -1;
 static int tracemark_fd = -1;
-
+static char *samples_filename;
 
 static void sig_handler(int sig)
 {
@@ -217,6 +218,33 @@ static void *display_stats(void *arg)
 	return NULL;
 }
 
+static void *store_samples(void *arg)
+{
+	struct stats *s = arg;
+	FILE *file;
+	struct latency_sample sample;
+	int i;
+
+	file = fopen(samples_filename, "w");
+	if (!file)
+		err_handler(errno, "fopen()");
+
+	while (!READ_ONCE(shutdown)) {
+		for (i = 0; i < num_threads; i++) {
+			sample.cpuid = i;
+			while (!ringbuffer_read(s[i].rb, &sample.ts, &sample.val)) {
+				fwrite(&sample, sizeof(struct latency_sample), 1, file);
+			}
+		}
+
+		usleep(250); /* 250 us interval */
+	}
+
+	fclose(file);
+
+	return NULL;
+}
+
 static void *worker(void *arg)
 {
 	struct stats *s = arg;
@@ -267,6 +295,9 @@ static void *worker(void *arg)
 		if (diff < s->hist_size)
 			s->hist[diff]++;
 
+		if (s->rb)
+			ringbuffer_write(s->rb, now, diff);
+
 		if (diff > break_val) {
 			stop_tracer(diff);
 			WRITE_ONCE(shutdown, 1);
@@ -294,6 +325,12 @@ static void create_workers(struct stats *s)
 		s[i].hist = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
 		if (!s[i].hist)
 			err_handler(errno, "calloc()");
+
+		if (samples_filename) {
+			s[i].rb = ringbuffer_create(1024 * 1024);
+			if (!s[i].rb)
+				err_handler(ENOMEM, "ringbuffer_create()");
+		}
 
 		err = pthread_attr_setaffinity_np(&attr, sizeof(mask), &mask);
 		if (err)
@@ -331,6 +368,7 @@ static struct option long_options[] = {
 	{ "file",	required_argument,	0,    'f' },
 	{ "priority",	required_argument,	0,    'p' },
 	{ "break",	required_argument,	0,    'b' },
+	{ "samples",	required_argument,	0,    's' },
 	{ 0, },
 };
 
@@ -344,6 +382,7 @@ static void usage(void)
 	printf("  --priority PRI, -p	Set worker thread priority. [1..98]\n");
 	printf("  --break VALUE, -b	Stop if max latency exceeds VALUE.\n");
 	printf("			Also the tracers\n");
+	printf("  --samples FILE, -s	Store all samples in to FILE\n");
 	printf("  --help, -h		Print this help\n");
 }
 
@@ -353,7 +392,7 @@ int main(int argc, char *argv[])
 	int i, c, fd, err;
 	struct stats *s;
 	uid_t uid, euid;
-	pthread_t pid;
+	pthread_t pid, iopid;
 	char *endptr;
 	long val;
 
@@ -363,7 +402,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vb:h", long_options, NULL);
+		c = getopt_long(argc, argv, "f:p:vb:s:h", long_options, NULL);
 		if (c < 0)
 			break;
 
@@ -408,6 +447,9 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 			break_val = val;
+			break;
+		case 's':
+			samples_filename = optarg;
 			break;
 		case 'h':
 			usage();
@@ -468,8 +510,20 @@ int main(int argc, char *argv[])
 			err_handler(err, "pthread_create()");
 	}
 
+	if (samples_filename) {
+		err = pthread_create(&iopid, NULL, store_samples, s);
+		if (err)
+			err_handler(err, "pthread_create()");
+	}
+
 	for (i = 0; i < num_threads; i++) {
 		err = pthread_join(s[i].pid, NULL);
+		if (err)
+			err_handler(err, "pthread_join()");
+	}
+
+	if (samples_filename) {
+		err = pthread_join(iopid, NULL);
 		if (err)
 			err_handler(err, "pthread_join()");
 	}
