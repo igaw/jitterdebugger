@@ -1,5 +1,5 @@
 /*
- * jitterdebugger - real time response messaurement tool
+ * jitterdebugger - real time response measurement tool
  *
  * Copyright (c) Siemens AG, 2018
  *
@@ -44,25 +44,13 @@
 #include <sched.h>
 #include <linux/limits.h>
 
+#include "jitterdebugger.h"
+
 #define VT100_ERASE_EOL		"\033[K"
 #define VT100_CURSOR_UP		"\033[%dA"
 
 #define NSEC_PER_SEC		1000000000
 #define HIST_MAX_ENTRIES	1000
-
-#define READ_ONCE(x)							\
-({									\
-	union { typeof(x) __v; char __t[1]; } __u = { .__t = { 0 } };	\
-	*(typeof(x) *) __u.__t = *(volatile typeof(x) *) &x;		\
-	__u.__v;							\
-})
-
-#define WRITE_ONCE(x, v)						\
-({									\
-	union { typeof(x) __v; char __t[1]; } __u = { .__v = (v) } ;	\
-	*(volatile typeof(x) *) &x = *(typeof(x) *) __u.__t;		\
-	__u.__v;							\
-})
 
 struct stats {
 	pthread_t pid;
@@ -83,11 +71,6 @@ static unsigned int break_val = UINT_MAX;
 static int trace_fd = -1;
 static int tracemark_fd = -1;
 
-static void err_handler(int error, char *msg)
-{
-	fprintf(stderr, "%s failed: %s\n", msg, strerror(error));
-	exit(1);
-}
 
 static void sig_handler(int sig)
 {
@@ -502,8 +485,7 @@ int main(int argc, char *argv[])
 	if (filename) {
 		stream = fopen(filename, "w");
 		if (!stream)
-			fprintf(stderr, "Could not open file '%s': %s\n",
-				filename, strerror(errno));
+			warn_handler("Could not open file '%s'", filename);
 	}
 	if (!stream)
 		stream = stdout;
