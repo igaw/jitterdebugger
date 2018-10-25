@@ -26,6 +26,7 @@
 #define __JITTERDEBUGGER_H
 
 #include <stdint.h>
+#include <time.h>
 
 #define READ_ONCE(x)							\
 ({									\
@@ -40,6 +41,12 @@
 	*(volatile typeof(x) *) &x = *(typeof(x) *) __u.__t;		\
 	__u.__v;							\
 })
+
+struct ringbuffer;
+
+struct ringbuffer *ringbuffer_create(unsigned int size);
+int ringbuffer_read(struct ringbuffer *rb, struct timespec *ts, uint64_t *val);
+int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val);
 
 void _err_handler(int error, char *format, ...)
 	__attribute__((format(printf, 2, 3)));
