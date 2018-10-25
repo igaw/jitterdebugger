@@ -1,7 +1,9 @@
 CFLAGS=-g -Wall -pthread -O3
 
-jitterdebugger: jitterdebugger.c
+all: jitterdebugger
+
+jitterdebugger: jitterutils.c jitterdebugger.c
 
 PHONY: .clean
 clean:
-	rm jitterdebugger
+	rm -f jitterdebugger
