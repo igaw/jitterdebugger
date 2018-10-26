@@ -24,6 +24,7 @@
 
 import sys
 import json
+import csv
 import argparse
 import matplotlib.pyplot as plt
 
@@ -55,6 +56,23 @@ def plot_histogram(filename):
     plt.show()
 
 
+def plot_samples(filename):
+    x = []
+    y = []
+
+    with open(filename,'r') as csvfile:
+        plots = csv.reader(csvfile, delimiter=';')
+        for row in plots:
+            x.append(float(row[1]))
+            y.append(int(row[2]))
+
+    plt.plot(x,y)
+    plt.xlabel('timestamp')
+    plt.ylabel('latency (us)')
+    plt.legend()
+    plt.show()
+
+
 def main():
     ap = argparse.ArgumentParser(description='Plot statistics collected with jitterdebugger')
     sap = ap.add_subparsers(dest='cmd')
@@ -62,9 +80,14 @@ def main():
     hrs = sap.add_parser('hist', help='Print historgram')
     hrs.add_argument('HIST_FILE')
 
+    srs = sap.add_parser('samples', help='Plot samples graph')
+    srs.add_argument('SAMPLE_FILE')
+
     args = ap.parse_args(sys.argv[1:])
     if args.cmd == 'hist':
         plot_histogram(args.HIST_FILE)
+    elif args.cmd == 'samples':
+        plot_samples(args.SAMPLE_FILE)
 
 if __name__ == '__main__':
     main()
