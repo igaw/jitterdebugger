@@ -24,11 +24,12 @@
 
 import sys
 import json
+import argparse
 import matplotlib.pyplot as plt
 
 
-def plot_histogram():
-    with open(sys.argv[1]) as file:
+def plot_histogram(filename):
+    with open(filename) as file:
         rawdata = json.load(file)
 
     cpu_id = 0
@@ -55,7 +56,15 @@ def plot_histogram():
 
 
 def main():
-    plot_histogram()
+    ap = argparse.ArgumentParser(description='Plot statistics collected with jitterdebugger')
+    sap = ap.add_subparsers(dest='cmd')
+
+    hrs = sap.add_parser('hist', help='Print historgram')
+    hrs.add_argument('HIST_FILE')
+
+    args = ap.parse_args(sys.argv[1:])
+    if args.cmd == 'hist':
+        plot_histogram(args.HIST_FILE)
 
 if __name__ == '__main__':
     main()
