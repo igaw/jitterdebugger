@@ -56,18 +56,18 @@ static void dump_samples(const char *filename, int cpuid)
 }
 
 static struct option long_options[] = {
-	{ "help",	no_argument,		0,	0 },
-	{ "cpu",	required_argument,	0,    'c' },
+	{ "help",	no_argument,		0,	'h' },
+	{ "cpu",	required_argument,	0,	'c' },
 	{ 0, },
 };
 
 static void usage(void)
 {
-	printf("jittersamples [-hc] FILE\n");
+	printf("jittersamples [options] FILE\n");
 	printf("\n");
 	printf("Usage:\n");
-	printf("  --help, -h		Print this help\n");
-	printf("  --cpu CPUID, -c	Filter CPUID\n");
+	printf("  -h, --help		Print this help\n");
+	printf("  -c, --cpu CPUID	Filter CPUID\n");
 }
 
 int main(int argc, char *argv[])

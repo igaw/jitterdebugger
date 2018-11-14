@@ -363,27 +363,34 @@ static void create_workers(struct stats *s)
 }
 
 static struct option long_options[] = {
-	{ "help",	no_argument,		0,	0 },
-	{ "verbose",	no_argument,		0,    'v' },
-	{ "file",	required_argument,	0,    'f' },
-	{ "priority",	required_argument,	0,    'p' },
-	{ "break",	required_argument,	0,    'b' },
-	{ "samples",	required_argument,	0,    's' },
+	{ "help",	no_argument,		0,	'h' },
+	{ "verbose",	no_argument,		0,	'v' },
+	{ "file",	required_argument,	0,	'f' },
+
+	{ "break",	required_argument,	0,	'b' },
+	{ "samples",	required_argument,	0,	's' },
+
+	{ "priority",	required_argument,	0,	'p' },
+
 	{ 0, },
 };
 
 static void usage(void)
 {
-	printf("jitterdebugger [-fpb]\n");
+	printf("jitterdebugger [options]\n");
 	printf("\n");
-	printf("Usage:\n");
-	printf("  --verbose, -v		Print live statistics\n");
-	printf("  --file FILE, -f	Store output into FILE\n");
-	printf("  --priority PRI, -p	Set worker thread priority. [1..98]\n");
-	printf("  --break VALUE, -b	Stop if max latency exceeds VALUE.\n");
-	printf("			Also the tracers\n");
-	printf("  --samples FILE, -s	Store all samples in to FILE\n");
-	printf("  --help, -h		Print this help\n");
+	printf("General usage:\n");
+	printf("  -h, --help            Print this help\n");
+	printf("  -v, --verbose         Print live statistics\n");
+	printf("  -f, --file FILE       Store output into FILE\n");
+	printf("\n");
+	printf("Sampling:\n");
+	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
+	printf("                        Also the tracers\n");
+	printf("  -s, --samples FILE    Store all samples in to FILE\n");
+	printf("\n");
+	printf("Threads: \n");
+	printf("  -p, --priority PRI    Worker thread priority. [1..98]\n");
 }
 
 int main(int argc, char *argv[])
