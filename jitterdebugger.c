@@ -54,6 +54,7 @@
 struct stats {
 	pthread_t pid;
 	pid_t tid;
+	unsigned int affinity;
 	unsigned int max;	/* in us */
 	unsigned int min;	/* in us */
 	unsigned int avg;	/* in us */
@@ -65,6 +66,7 @@ struct stats {
 };
 
 static int shutdown;
+static cpu_set_t affinity;
 static unsigned int num_threads;
 static unsigned int priority = 80;
 static unsigned int break_val = UINT_MAX;
@@ -156,6 +158,54 @@ static pid_t gettid(void)
 	return syscall(SYS_gettid);
 }
 
+static int sysfs_load_str(const char *path, char **buf)
+{
+	int fd, ret;
+	size_t len;
+
+	fd = TEMP_FAILURE_RETRY(open(path, O_RDONLY));
+	if (fd < 0)
+		return -errno;
+
+	len = sysconf(_SC_PAGESIZE);
+
+	*buf = malloc(len);
+	if (!*buf) {
+		ret = -ENOMEM;
+		goto out_fd;
+	}
+
+	ret = read(fd, *buf, len - 1);
+	if (ret < 0) {
+		ret = -errno;
+		goto out_buf;
+	}
+
+	buf[ret] = 0;
+out_buf:
+	if (ret < 0)
+		free(*buf);
+out_fd:
+	close(fd);
+	return ret;
+}
+
+static int cpus_online(cpu_set_t *set)
+{
+	int ret;
+	char *buf;
+
+	ret = sysfs_load_str("/sys/devices/system/cpu/online", &buf);
+	if (ret < 0)
+		return -errno;
+
+	CPU_ZERO(set);
+	ret = cpuset_parse(set, buf);
+	free(buf);
+
+	return ret;
+}
+
 static void dump_stats(FILE *f, struct stats *s)
 {
 	int i, j, comma;
@@ -200,10 +250,10 @@ static void *display_stats(void *arg)
 		printf(VT100_CURSOR_UP, num_threads);
 
 		for (i = 0; i < num_threads; i++) {
-			printf("T:%2d (%5ld) C:%10" PRIu64
+			printf("T:%2d (%5ld) A:%2d C:%10" PRIu64
 				" Min:%10u Max:%10u Avg:%8.2f "
 				VT100_ERASE_EOL "\n",
-				i, (long)s[i].tid,
+				i, (long)s[i].tid, s[i].affinity,
 				s[i].total,
 				s[i].min,
 				s[i].max,
@@ -311,14 +361,24 @@ static void create_workers(struct stats *s)
 	struct sched_param sched;
 	pthread_attr_t attr;
 	cpu_set_t mask;
-	int i, err;
+	int i, t, err;
 
 	pthread_attr_init(&attr);
 
-	for (i = 0 ; i < num_threads; i++) {
+	for (i = 0, t = 0; i < num_threads; i++) {
 		CPU_ZERO(&mask);
-		CPU_SET(i, &mask);
 
+		/*
+		 * Skip unset cores. will not crash as long as
+		 * num_threads <= CPU_COUNT(&affinity)
+		 */
+		while (!CPU_ISSET(t, &affinity))
+			t++;
+
+		CPU_SET(t, &mask);
+
+		/* Don't stay on the same core in next loop */
+		s[i].affinity = t++;
 		s[i].min = UINT_MAX;
 		s[i].hist_size = HIST_MAX_ENTRIES;
 		s[i].hist = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
@@ -369,6 +429,7 @@ static struct option long_options[] = {
 	{ "break",	required_argument,	0,	'b' },
 	{ "samples",	required_argument,	0,	's' },
 
+	{ "affinity",	required_argument,	0,	'a' },
 	{ "priority",	required_argument,	0,	'p' },
 
 	{ 0, },
@@ -389,6 +450,10 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -s, --samples FILE    Store all samples in to FILE\n");
 	printf("\n");
 	printf("Threads: \n");
+	printf("  -a, --affinity CPUSET Core affinity specification\n");
+	printf("                        e.g. 0,2,5-7 starts a thread on first, third and last two\n");
+	printf("                        cores on a 8-core system.\n");
+	printf("                        May also be set in hexadecimal with '0x' prefix\n");
 	printf("  -p, --priority PRI    Worker thread priority. [1..98]\n");
 
 	exit(status);
@@ -401,7 +466,10 @@ int main(int argc, char *argv[])
 	struct stats *s;
 	uid_t uid, euid;
 	pthread_t pid, iopid;
+	cpu_set_t affinity_available, affinity_set;
 	long val;
+
+	CPU_ZERO(&affinity_set);
 
 	/* Command line options */
 	char *filename = NULL;
@@ -409,7 +477,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vb:s:h", long_options, NULL);
+		c = getopt_long(argc, argv, "f:p:vb:s:a:h", long_options, NULL);
 		if (c < 0)
 			break;
 
@@ -439,6 +507,13 @@ int main(int argc, char *argv[])
 			break;
 		case 'h':
 			usage(0);
+		case 'a':
+			val = cpuset_parse(&affinity_set, optarg);
+			if (val < 0) {
+				fprintf(stderr, "Invalid value for affinity. Valid range is [0..]\n");
+				exit(1);
+			}
+			break;
 		default:
 			printf("unknown option\n");
 			usage(1);
@@ -473,15 +548,23 @@ int main(int argc, char *argv[])
 	if (break_val != UINT_MAX)
 		open_trace_fds();
 
-	num_threads = get_nprocs();
-	if (num_threads > CPU_SETSIZE) {
-		fprintf(stderr,
-			"%s supports only up to %d cores, but %d found\n"
-			"Only running %d threads\n",
-			argv[0], CPU_SETSIZE, num_threads, CPU_SETSIZE);
-		num_threads = CPU_SETSIZE;
+	if (cpus_online(&affinity_available) < 0)
+		err_handler(errno, "cpus_available()");
+
+	if (CPU_COUNT(&affinity_set)) {
+		CPU_AND(&affinity, &affinity_set, &affinity_available);
+		if (!CPU_EQUAL(&affinity, &affinity_set))
+			printf("warning: affinity reduced\n");
+	} else
+		affinity = affinity_available;
+
+	if (verbose) {
+		printf("affinity: ");
+		cpuset_fprint(stdout, &affinity);
+		printf("\n");
 	}
 
+	num_threads = CPU_COUNT(&affinity);
 	s = calloc(num_threads, sizeof(struct stats));
 	if (!s)
 		err_handler(errno, "calloc()");
