@@ -63,7 +63,7 @@ void _warn_handler(char *format, ...)
 	_err_handler(error, "%s:%s(): " fmt, __FILE__, __FUNCTION__, ## arg); \
 } while (0)
 #define warn_handler(fmt, arg...) do {						\
-	_warn_handler("%s:%s(): " fmt, __FILE__, __FUNCTION__, ## arg); \
+	_warn_handler("%s:%s(): " fmt "\n", __FILE__, __FUNCTION__, ## arg); \
 } while (0)
 
 #endif /* __JITTTERDEBUGGER_H */
