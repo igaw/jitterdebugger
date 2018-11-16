@@ -102,6 +102,13 @@ static inline struct timespec ts_add(struct timespec t1, struct timespec t2)
 	return t1;
 }
 
+static inline void write_or_fail(int fd, const void *buf, size_t count,
+				 const char *err)
+{
+	if (write(fd, buf, count) != count)
+		err_handler(errno, "%s", err);
+}
+
 static int c_states_disable(void)
 {
 	uint32_t latency = 0;
@@ -116,7 +123,8 @@ static int c_states_disable(void)
 		err_handler(errno, "open()");
 	}
 
-	write(fd, &latency, sizeof(latency));
+	write_or_fail(fd, &latency, sizeof(latency),
+		      "Error writing to /dev/cpu_dma_latency\n");
 
 	return fd;
 }
@@ -147,8 +155,8 @@ static void stop_tracer(uint64_t diff)
 	int len;
 
 	len = snprintf(buf, 128, "Hit latency %lu", diff);
-	write(tracemark_fd, buf, len);
-	write(trace_fd, "0\n", 2);
+	write_or_fail(tracemark_fd, buf, len, "Error writing to tracemark");
+	write_or_fail(trace_fd, "0\n", 2, "Error writing to trace");
 }
 
 static pid_t gettid(void)

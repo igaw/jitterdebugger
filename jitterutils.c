@@ -117,12 +117,14 @@ void _err_handler(int error, char *fmt, ...)
 	char *msg;
 
 	va_start(ap, fmt);
-	vasprintf(&msg, fmt, ap);
+	if (vasprintf(&msg, fmt, ap) == -1)
+		goto out;
 	va_end(ap);
 
 	fprintf(stderr, "%s: %s\n", msg, strerror(error));
 
 	free(msg);
+out:
 	exit(1);
 }
 
