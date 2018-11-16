@@ -400,7 +400,6 @@ int main(int argc, char *argv[])
 	struct stats *s;
 	uid_t uid, euid;
 	pthread_t pid, iopid;
-	char *endptr;
 	long val;
 
 	/* Command line options */
@@ -418,17 +417,7 @@ int main(int argc, char *argv[])
 			filename = optarg;
 			break;
 		case 'p':
-			errno = 0;
-			val = strtol(optarg, &endptr, 10);
-			if ((errno == ERANGE &&	(val == LONG_MAX || val == LONG_MIN))
-					|| (errno != 0 && val == 0)) {
-				err_handler(errno, "strtol()");
-			}
-			if (endptr == optarg) {
-				fprintf(stderr, "No digits found\n");
-				exit(1);
-			}
-
+			val = parse_dec(optarg);
 			if (val < 1 || val > 98) {
 				fprintf(stderr, "Invalid value for priority. Valid range is [1..98]\n");
 				exit(1);
@@ -439,17 +428,8 @@ int main(int argc, char *argv[])
 			verbose = 1;
 			break;
 		case 'b':
-			val = strtol(optarg, &endptr, 10);
-			if ((errno == ERANGE &&	(val == LONG_MAX || val == LONG_MIN))
-					|| (errno != 0 && val == 0)) {
-				err_handler(errno, "strtol()");
-			}
-			if (endptr == optarg) {
-				fprintf(stderr, "No digits found\n");
-				exit(1);
-			}
-
-			if (val < 0) {
+			val = parse_dec(optarg);
+			if (val <= 0) {
 				fprintf(stderr, "Invalid value for break. Valid range is [1..]\n");
 				exit(1);
 			}

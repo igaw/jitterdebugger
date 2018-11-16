@@ -73,7 +73,6 @@ static void usage(void)
 int main(int argc, char *argv[])
 {
 	int cpuid = -1;
-	char *endptr;
 	long val;
 	int c;
 
@@ -87,17 +86,7 @@ int main(int argc, char *argv[])
 			usage();
 			exit(0);
 		case 'c':
-			errno = 0;
-			val = strtol(optarg, &endptr, 10);
-			if ((errno == ERANGE &&	(val == LONG_MAX || val == LONG_MIN))
-					|| (errno != 0 && val == 0)) {
-				err_handler(errno, "strtol()");
-			}
-			if (endptr == optarg) {
-				fprintf(stderr, "No digits found\n");
-				exit(1);
-			}
-
+			val = parse_dec(optarg);
 			if (val < 0) {
 				fprintf(stderr, "Invalid value for CPUID. Valid range is [0..]\n");
 				exit(1);
