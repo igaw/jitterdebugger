@@ -66,4 +66,13 @@ void _warn_handler(char *format, ...)
 	_warn_handler("%s:%s(): " fmt "\n", __FILE__, __FUNCTION__, ## arg); \
 } while (0)
 
-#endif /* __JITTTERDEBUGGER_H */
+/* Returns parsed zero or positive number, or a negative error value.
+ * len optionally stores the length of the parsed string, may be NULL. */
+long int parse_num(const char *str, int base, size_t *len);
+
+static inline long int parse_dec(const char *str)
+{
+	return parse_num(str, 10, NULL);
+}
+
+#endif /* __JITTERDEBUGGER_H */

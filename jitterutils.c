@@ -24,6 +24,7 @@
 
 #define _GNU_SOURCE
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -133,5 +134,26 @@ void _warn_handler(char *fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
+}
 
+/*
+ * parse_num parses zero or positive long integers. A negative return value
+ * indicated an error.
+ */
+long int parse_num(const char *str, int base, size_t *len)
+{
+	long int ret;
+	char *endptr;
+
+	errno = 0;
+	ret = strtol(str, &endptr, base);
+	if (errno)
+		return -errno;
+	if (ret < 0)
+		return -ERANGE;
+
+	if (len)
+		*len = endptr - str;
+
+	return ret;
 }
