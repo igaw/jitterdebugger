@@ -41,7 +41,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sched.h>
 #include <linux/limits.h>
 
 #include "jitterdebugger.h"

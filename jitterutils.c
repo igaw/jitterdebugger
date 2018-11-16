@@ -157,3 +157,114 @@ long int parse_num(const char *str, int base, size_t *len)
 
 	return ret;
 }
+
+/* cpu_set_t helpers */
+
+void cpuset_from_bits(cpu_set_t *set, unsigned long bits)
+{
+	unsigned i;
+
+	for (i = 0; i < sizeof(bits) * 8; i++)
+		if ((1UL << i) & bits)
+			CPU_SET(i, set);
+}
+
+unsigned long cpuset_to_bits(cpu_set_t *set)
+{
+	unsigned long bits = 0;
+	unsigned int i, t, bit;
+
+	for (i = 0, t = 0; t < CPU_COUNT(set); i++) {
+		bit = CPU_ISSET(i, set);
+		bits |= bit << i;
+		t += bit;
+	}
+
+	return bits;
+}
+
+static inline void _cpuset_fprint_end(FILE *f, unsigned long i, unsigned long r)
+{
+	if (r > 1)
+		fprintf(f, "%c%lu", r > 2 ? '-' : ',', i - 1);
+}
+
+void cpuset_fprint(FILE *f, cpu_set_t *set)
+{
+	unsigned long bit = 0, range = 0;
+	unsigned long i, t, comma = 0;
+
+	for (i = 0, t = 0; t < CPU_COUNT(set); t += bit, i++) {
+		bit = CPU_ISSET(i, set);
+		if (!range && bit) {
+			if (comma)
+				fputc(',', f);
+
+			comma = 1;
+			fprintf(f, "%lu", i);
+		} else if (!bit) {
+			_cpuset_fprint_end(f, i, range);
+			range = 0;
+		}
+		range += bit;
+	}
+
+	_cpuset_fprint_end(f, i, range);
+	fprintf(f, " = %u [0x%lX]", CPU_COUNT(set), cpuset_to_bits(set));
+}
+
+static long int _cpuset_parse_num(const char *str, int base, size_t *len)
+{
+	long int ret;
+
+	ret = parse_num(str, base, len);
+	if (ret < 0)
+		err_abort("cpuset: unable to parse string %s", str);
+
+	return ret;
+}
+
+ssize_t cpuset_parse(cpu_set_t *set, const char *str)
+{
+	unsigned int i, first, last;
+	size_t len;
+	ssize_t len_next;
+	long int num = 0;
+
+	if (!strncmp(str, "0x", 2)) {
+		num = _cpuset_parse_num(str, 16, &len);
+		cpuset_from_bits(set, (unsigned long) num);
+		return len;
+	}
+
+	num = _cpuset_parse_num(str, 10, &len);
+
+	str += len;
+	first = num;
+
+	if (str[0] == '-') {
+		num = _cpuset_parse_num(str + 1, 10, &len);
+		str += 1 + len;
+		last = len ? num + 1 : CPU_SETSIZE; /* "x-" means x-CPU_SIZE*/
+	} else
+		last = first + 1;
+
+	if (CPU_SETSIZE < last) {
+		warn_handler("cpu num %d bigger than CPU_SETSIZE(%u), reducing",
+			     last, CPU_SETSIZE);
+		last = CPU_SETSIZE;
+	}
+
+	for (i = first; i < last; i++)
+		CPU_SET(i, set);
+
+	if (str[0] == ',') {
+		len_next = cpuset_parse(set, str + 1);
+		if (len_next < 0)
+			return len_next;
+
+		len += len_next;
+	}
+
+	return len;
+}

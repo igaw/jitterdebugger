@@ -26,6 +26,7 @@
 #define __JITTERDEBUGGER_H
 
 #include <stdint.h>
+#include <sched.h>
 #include <time.h>
 
 #define READ_ONCE(x)							\
@@ -80,5 +81,16 @@ static inline long int parse_dec(const char *str)
 {
 	return parse_num(str, 10, NULL);
 }
+
+/* cpu_set_t helpers */
+void cpuset_from_bits(cpu_set_t *set, unsigned long bits);
+unsigned long cpuset_to_bits(cpu_set_t *set);
+
+/* Prints cpu_set_t as an affinity specification. */
+void cpuset_fprint(FILE *f, cpu_set_t *set);
+
+/* Parses affinity specification (i.e. 0,2-3,7) into a cpu_set_t.
+   Returns parsed string length or -errno. */
+ssize_t cpuset_parse(cpu_set_t *set, const char *str);
 
 #endif /* __JITTERDEBUGGER_H */
