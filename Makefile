@@ -1,11 +1,15 @@
 CFLAGS=-g -Wall -pthread -O3
+LDFLAGS=-pthread
 
-all: jitterdebugger jittersamples
+TARGETS=jitterdebugger jittersamples
 
-jitterdebugger: jitterutils.c jitterdebugger.c
+all: $(TARGETS)
 
-jittersamples: jitterutils.c jittersamples.c
+jitterdebugger: jitterutils.o jitterdebugger.o
+
+jittersamples: jitterutils.o jittersamples.o
 
 PHONY: .clean
 clean:
-	rm -f jitterdebugger
+	rm -f *.o
+	rm -f $(TARGETS)
