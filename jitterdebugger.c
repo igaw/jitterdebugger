@@ -69,6 +69,7 @@ struct stats {
 static int shutdown;
 static cpu_set_t affinity;
 static unsigned int num_threads;
+static unsigned int num_threads_per_core = 1;
 static unsigned int priority = 80;
 static unsigned int break_val = UINT_MAX;
 static unsigned int sleep_interval_us = 250; /* 250 us interval */
@@ -380,8 +381,15 @@ static void create_workers(struct stats *s)
 
 		CPU_SET(t, &mask);
 
-		/* Don't stay on the same core in next loop */
-		s[i].affinity = t++;
+		s[i].affinity = t;
+
+		/*
+		 * Increment current core to next one only if the thread
+		 * block is over
+		 */
+		if (i % num_threads_per_core == num_threads_per_core-1)
+			t++;
+
 		s[i].min = UINT_MAX;
 		s[i].hist_size = HIST_MAX_ENTRIES;
 		s[i].hist = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
@@ -435,6 +443,7 @@ static struct option long_options[] = {
 
 	{ "affinity",	required_argument,	0,	'a' },
 	{ "priority",	required_argument,	0,	'p' },
+	{ "threads",	required_argument,	0,	't' },
 
 	{ 0, },
 };
@@ -460,6 +469,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("                        cores on a 8-core system.\n");
 	printf("                        May also be set in hexadecimal with '0x' prefix\n");
 	printf("  -p, --priority PRI    Worker thread priority. [1..98]\n");
+	printf("  -t, --threads NUM     Number of threads to run on one core. Default is 1. [1..]\n");
 
 	exit(status);
 }
@@ -483,7 +493,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vb:i:s:a:h", long_options, NULL);
+		c = getopt_long(argc, argv, "f:p:vb:i:s:a:t:h", long_options, NULL);
 		if (c < 0)
 			break;
 
@@ -527,6 +537,13 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "Invalid value for affinity. Valid range is [0..]\n");
 				exit(1);
 			}
+			break;
+		case 't':
+			val = parse_dec(optarg);
+			if (val < 1)
+				err_abort("Invalid value for threads. "
+					  "Valid range is [1..].\n");
+			num_threads_per_core = val;
 			break;
 		default:
 			usage(1);
@@ -577,7 +594,7 @@ int main(int argc, char *argv[])
 		printf("\n");
 	}
 
-	num_threads = CPU_COUNT(&affinity);
+	num_threads = CPU_COUNT(&affinity) * num_threads_per_core;
 	s = calloc(num_threads, sizeof(struct stats));
 	if (!s)
 		err_handler(errno, "calloc()");
