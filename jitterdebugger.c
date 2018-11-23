@@ -46,7 +46,7 @@
 #include "jitterdebugger.h"
 
 #define VT100_ERASE_EOL		"\033[K"
-#define VT100_CURSOR_UP		"\033[%dA"
+#define VT100_CURSOR_UP		"\033[%uA"
 
 #define NSEC_PER_SEC		1000000000
 #define HIST_MAX_ENTRIES	1000
@@ -208,19 +208,19 @@ static int cpus_online(cpu_set_t *set)
 
 static void dump_stats(FILE *f, struct stats *s)
 {
-	int i, j, comma;
+	unsigned int i, j, comma;
 
 	fprintf(f, "{\n");
 	fprintf(f, "  \"cpu\": {\n");
 	for (i = 0; i < num_threads; i++) {
-		fprintf(f, "    \"%d\": {\n", i);
+		fprintf(f, "    \"%u\": {\n", i);
 
 		fprintf(f, "      \"histogram\": {");
 		for (j = 0, comma = 0; j < s[i].hist_size; j++) {
 			if (!s[i].hist[j])
 				continue;
 			fprintf(f, "%s", comma ? ",\n" : "\n");
-			fprintf(f, "        \"%d\": %lu", j, s[i].hist[j]);
+			fprintf(f, "        \"%u\": %lu", j, s[i].hist[j]);
 			comma = 1;
 		}
 		if (comma)
@@ -241,7 +241,7 @@ static void dump_stats(FILE *f, struct stats *s)
 static void *display_stats(void *arg)
 {
 	struct stats *s = arg;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < num_threads; i++)
 		printf("\n");
@@ -250,7 +250,7 @@ static void *display_stats(void *arg)
 		printf(VT100_CURSOR_UP, num_threads);
 
 		for (i = 0; i < num_threads; i++) {
-			printf("T:%2d (%5ld) A:%2d C:%10" PRIu64
+			printf("T:%2u (%5lu) A:%2u C:%10" PRIu64
 				" Min:%10u Max:%10u Avg:%8.2f "
 				VT100_ERASE_EOL "\n",
 				i, (long)s[i].tid, s[i].affinity,
@@ -361,7 +361,8 @@ static void create_workers(struct stats *s)
 	struct sched_param sched;
 	pthread_attr_t attr;
 	cpu_set_t mask;
-	int i, t, err;
+	unsigned int i, t;
+	int err;
 
 	pthread_attr_init(&attr);
 
@@ -462,7 +463,8 @@ static void __attribute__((noreturn)) usage(int status)
 int main(int argc, char *argv[])
 {
 	struct sigaction sa;
-	int i, c, fd, err;
+	unsigned int i;
+	int c, fd, err;
 	struct stats *s;
 	uid_t uid, euid;
 	pthread_t pid, iopid;
@@ -616,7 +618,7 @@ int main(int argc, char *argv[])
 	if (verbose && break_val != UINT_MAX) {
 		for (i = 0; i < num_threads; i++) {
 			if (s[i].max > break_val)
-				printf("Thread %ld on CPU %d hit %u us latency\n",
+				printf("Thread %lu on CPU %u hit %u us latency\n",
 					(long)s[i].tid, i, s[i].max);
 		}
 	}
