@@ -261,7 +261,7 @@ static void *display_stats(void *arg)
 				(double) s[i].count);
 		}
 		fflush(stdout);
-		sleep(1);
+		usleep(50 * 1000); /* 50 ms interval */
 	}
 
 	return NULL;
