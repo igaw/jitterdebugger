@@ -61,6 +61,8 @@ struct stats {
 	unsigned int avg;	/* in us */
 	unsigned int hist_size;
 	uint64_t *hist;		/* each slot is one us */
+	uint64_t *hist_overflows; /* continous list */
+	size_t hist_overflows_last;
 	uint64_t total;
 	uint64_t count;
 	struct ringbuffer *rb;
@@ -212,6 +214,7 @@ static int cpus_online(cpu_set_t *set)
 static void dump_stats(FILE *f, struct stats *s)
 {
 	unsigned int i, j, comma;
+	uint64_t acc = 1ul;
 
 	fprintf(f, "{\n");
 	fprintf(f, "  \"cpu\": {\n");
@@ -225,6 +228,16 @@ static void dump_stats(FILE *f, struct stats *s)
 			fprintf(f, "%s", comma ? ",\n" : "\n");
 			fprintf(f, "        \"%u\": %lu", j, s[i].hist[j]);
 			comma = 1;
+		}
+		for (j = 0; j < s[i].hist_overflows_last; j++) {
+			if (j+1 != s[i].hist_overflows_last &&
+				s[i].hist_overflows[j] == s[i].hist_overflows[j+1]) {
+				acc++;
+				continue;
+			}
+			fprintf(f, ",\n");
+			fprintf(f, "        \"%lu\": %lu", s[i].hist_overflows[j], acc);
+			acc = 1;
 		}
 		if (comma)
 			fprintf(f, "\n");
@@ -297,6 +310,12 @@ static void *store_samples(void *arg)
 	return NULL;
 }
 
+static inline int hist_cmp(const void *a, const void *b)
+{
+	/* ascending sorting */
+	return *(uint64_t*) a > *(uint64_t*) b;
+}
+
 static void *worker(void *arg)
 {
 	struct stats *s = arg;
@@ -344,8 +363,12 @@ static void *worker(void *arg)
 		s->count++;
 		s->total += diff;
 
-		if (diff < s->hist_size)
+		if (diff >= s->hist_size) {
+			if (s->hist_overflows_last != s->hist_size)
+				s->hist_overflows[s->hist_overflows_last++] = diff;
+		} else
 			s->hist[diff]++;
+
 
 		if (s->rb)
 			ringbuffer_write(s->rb, now, diff);
@@ -355,6 +378,9 @@ static void *worker(void *arg)
 			WRITE_ONCE(shutdown, 1);
 		}
 	}
+
+	qsort(s->hist_overflows, s->hist_overflows_last,
+	      sizeof(s->hist_overflows[0]), &hist_cmp);
 
 	return NULL;
 }
@@ -394,6 +420,11 @@ static void create_workers(struct stats *s)
 		s[i].hist_size = HIST_MAX_ENTRIES;
 		s[i].hist = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
 		if (!s[i].hist)
+			err_handler(errno, "calloc()");
+
+		s[i].hist_overflows_last = 0;
+		s[i].hist_overflows = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
+		if (!s[i].hist_overflows)
 			err_handler(errno, "calloc()");
 
 		if (samples_filename) {
