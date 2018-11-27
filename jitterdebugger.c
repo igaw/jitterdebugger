@@ -49,6 +49,7 @@
 #define VT100_CURSOR_UP		"\033[%uA"
 
 #define NSEC_PER_SEC		1000000000
+#define NSEC_PER_US		1000UL
 #define HIST_MAX_ENTRIES	1000
 
 struct stats {
@@ -70,6 +71,7 @@ static cpu_set_t affinity;
 static unsigned int num_threads;
 static unsigned int priority = 80;
 static unsigned int break_val = UINT_MAX;
+static unsigned int sleep_interval_us = 250; /* 250 us interval */
 static int trace_fd = -1;
 static int tracemark_fd = -1;
 static char *samples_filename;
@@ -310,7 +312,7 @@ static void *worker(void *arg)
 	s->tid = gettid();
 
 	interval.tv_sec = 0;
-	interval.tv_nsec = 250 * 1000; /* 250 us interval */
+	interval.tv_nsec = sleep_interval_us * NSEC_PER_US;
 
 	while (!READ_ONCE(shutdown)) {
 		/* Time critical part starts here */
@@ -428,6 +430,7 @@ static struct option long_options[] = {
 	{ "file",	required_argument,	0,	'f' },
 
 	{ "break",	required_argument,	0,	'b' },
+	{ "interval",	required_argument,	0,	'i' },
 	{ "samples",	required_argument,	0,	's' },
 
 	{ "affinity",	required_argument,	0,	'a' },
@@ -448,6 +451,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("Sampling:\n");
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
+	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
 	printf("  -s, --samples FILE    Store all samples in to FILE\n");
 	printf("\n");
 	printf("Threads: \n");
@@ -479,7 +483,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vb:s:a:h", long_options, NULL);
+		c = getopt_long(argc, argv, "f:p:vb:i:s:a:h", long_options, NULL);
 		if (c < 0)
 			break;
 
@@ -503,6 +507,14 @@ int main(int argc, char *argv[])
 				err_abort("Invalid value for break. "
 					  "Valid range is [1..]\n");
 			break_val = val;
+			break;
+		case 'i':
+			val = parse_dec(optarg);
+			if (val < 1)
+				err_abort("Invalid value for interval. "
+					  "Valid range is [1..]. "
+					  "Default: %u.\n", sleep_interval_us);
+			sleep_interval_us = val;
 			break;
 		case 's':
 			samples_filename = optarg;
