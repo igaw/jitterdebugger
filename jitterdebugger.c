@@ -418,10 +418,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			val = parse_dec(optarg);
-			if (val < 1 || val > 98) {
-				fprintf(stderr, "Invalid value for priority. Valid range is [1..98]\n");
-				exit(1);
-			}
+			if (val < 1 || val > 98)
+				err_abort("Invalid value for priority. "
+					  "Valid range is [1..98]\n");
 			priority = val;
 			break;
 		case 'v':
@@ -429,10 +428,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'b':
 			val = parse_dec(optarg);
-			if (val <= 0) {
-				fprintf(stderr, "Invalid value for break. Valid range is [1..]\n");
-				exit(1);
-			}
+			if (val <= 0)
+				err_abort("Invalid value for break. "
+					  "Valid range is [1..]\n");
 			break_val = val;
 			break;
 		case 's':
