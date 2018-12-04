@@ -87,10 +87,9 @@ int main(int argc, char *argv[])
 			exit(0);
 		case 'c':
 			val = parse_dec(optarg);
-			if (val < 0) {
-				fprintf(stderr, "Invalid value for CPUID. Valid range is [0..]\n");
-				exit(1);
-			}
+			if (val < 0)
+				err_abort("Invalid value for CPUID. "
+					  "Valid range is [0..]\n");
 			cpuid = val;
 			break;
 		default:

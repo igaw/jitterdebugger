@@ -66,6 +66,12 @@ void _warn_handler(char *format, ...)
 	_warn_handler("%s:%s(): " fmt "\n", __FILE__, __FUNCTION__, ## arg); \
 } while (0)
 
+#define err_abort(fmt, arg...) do {	\
+	fprintf(stderr, fmt, ## arg);	\
+	exit(1);			\
+} while (0)
+
+
 /* Returns parsed zero or positive number, or a negative error value.
  * len optionally stores the length of the parsed string, may be NULL. */
 long int parse_num(const char *str, int base, size_t *len);
