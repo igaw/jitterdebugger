@@ -61,13 +61,15 @@ static struct option long_options[] = {
 	{ 0, },
 };
 
-static void usage(void)
+static void __attribute__((noreturn)) usage(int status)
 {
 	printf("jittersamples [options] FILE\n");
 	printf("\n");
 	printf("Usage:\n");
 	printf("  -h, --help		Print this help\n");
 	printf("  -c, --cpu CPUID	Filter CPUID\n");
+
+	exit(status);
 }
 
 int main(int argc, char *argv[])
@@ -83,8 +85,7 @@ int main(int argc, char *argv[])
 
 		switch (c) {
 		case 'h':
-			usage();
-			exit(0);
+			usage(0);
 		case 'c':
 			val = parse_dec(optarg);
 			if (val < 0)
@@ -94,15 +95,13 @@ int main(int argc, char *argv[])
 			break;
 		default:
 			printf("unknown option\n");
-			usage();
-			exit(1);
+			usage(1);
 		}
 	}
 
 	if (optind == argc) {
 		printf("Missing filename\n");
-		usage();
-		exit(1);
+		usage(1);
 	}
 
 	dump_samples(argv[optind], cpuid);
