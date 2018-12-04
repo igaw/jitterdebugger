@@ -375,7 +375,7 @@ static struct option long_options[] = {
 	{ 0, },
 };
 
-static void usage(void)
+static void __attribute__((noreturn)) usage(int status)
 {
 	printf("jitterdebugger [options]\n");
 	printf("\n");
@@ -391,6 +391,8 @@ static void usage(void)
 	printf("\n");
 	printf("Threads: \n");
 	printf("  -p, --priority PRI    Worker thread priority. [1..98]\n");
+
+	exit(status);
 }
 
 int main(int argc, char *argv[])
@@ -437,12 +439,10 @@ int main(int argc, char *argv[])
 			samples_filename = optarg;
 			break;
 		case 'h':
-			usage();
-			exit(0);
+			usage(0);
 		default:
 			printf("unknown option\n");
-			usage();
-			exit(1);
+			usage(1);
 		}
 	}
 
