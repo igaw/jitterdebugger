@@ -517,7 +517,6 @@ int main(int argc, char *argv[])
 			}
 			break;
 		default:
-			printf("unknown option\n");
 			usage(1);
 		}
 	}
