@@ -40,34 +40,36 @@
 #include <sys/syscall.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <stdbool.h>
 #include <fcntl.h>
 #include <linux/limits.h>
 
 #include "jitterdebugger.h"
 
+#define FMT_THREAD "T:%2u (%5lu) A:%2u C:%14" PRIu64
 #define VT100_ERASE_EOL		"\033[K"
 #define VT100_CURSOR_UP		"\033[%uA"
 
-#define NSEC_PER_SEC		1000000000
-#define NS_PER_US		1000UL
-#define HIST_MAX_ENTRIES	1000
+#define NSEC_PER_SEC		1000000000UL
+#define NSEC_PER_USEC		1000UL
 
 struct stats {
 	pthread_t pid;
 	pid_t tid;
 	unsigned int affinity;
-	unsigned int max;	/* in us */
-	unsigned int min;	/* in us */
-	unsigned int avg;	/* in us */
+	unsigned int max;	/* in latency unit (us or ns) */
+	unsigned int min;	/* in latency unit (us or ns) */
+	unsigned int avg;	/* in latency unit (us or ns) */
 	unsigned int hist_size;
-	uint64_t *hist;		/* each slot is one us */
-	uint64_t *hist_overflows; /* continous list */
+	uint64_t *hist;		/* each slot is one latency occurence */
+	uint64_t *hist_overflows; /* continous list of occurences */
 	size_t hist_overflows_last;
 	uint64_t total;
 	uint64_t count;
 	struct ringbuffer *rb;
 };
 
+static bool ns;
 static int shutdown;
 static cpu_set_t affinity;
 static unsigned int num_threads;
@@ -75,9 +77,12 @@ static unsigned int num_threads_per_core = 1;
 static unsigned int priority = 80;
 static unsigned int break_val = UINT_MAX;
 static unsigned int sleep_interval_us = 250; /* 250 us interval */
+static const size_t hist_size_us = 1000;
 static int trace_fd = -1;
 static int tracemark_fd = -1;
 static char *samples_filename;
+static const char *stats_fmt =
+	FMT_THREAD " Min:%6u Max:%10u Avg:%8.2f" VT100_ERASE_EOL "\n";
 
 static void sig_handler(int sig)
 {
@@ -91,8 +96,8 @@ static inline int64_t ts_sub(struct timespec t1, struct timespec t2)
 	diff = NSEC_PER_SEC * (int64_t)((int) t1.tv_sec - (int) t2.tv_sec);
 	diff += ((int) t1.tv_nsec - (int) t2.tv_nsec);
 
-	/* Return diff in us */
-	return diff / 1000;
+	/* Return diff in ns */
+	return diff;
 }
 
 static inline struct timespec ts_add(struct timespec t1, struct timespec t2)
@@ -217,6 +222,7 @@ static void dump_stats(FILE *f, struct stats *s)
 	uint64_t acc = 1ul;
 
 	fprintf(f, "{\n");
+	fprintf(f, "  \"time_unit\": \"%s\",\n", ns ? "ns" : "us");
 	fprintf(f, "  \"cpu\": {\n");
 	for (i = 0; i < num_threads; i++) {
 		fprintf(f, "    \"%u\": {\n", i);
@@ -267,15 +273,9 @@ static void *display_stats(void *arg)
 		printf(VT100_CURSOR_UP, num_threads);
 
 		for (i = 0; i < num_threads; i++) {
-			printf("T:%2u (%5lu) A:%2u C:%10" PRIu64
-				" Min:%10u Max:%10u Avg:%8.2f "
-				VT100_ERASE_EOL "\n",
-				i, (long)s[i].tid, s[i].affinity,
-				s[i].total,
-				s[i].min,
-				s[i].max,
-				(double) s[i].total /
-				(double) s[i].count);
+			printf(stats_fmt, i, (long)s[i].tid, s[i].affinity,
+				s[i].total, s[i].min, s[i].max, 
+				(double) s[i].total / (double) s[i].count);
 		}
 		fflush(stdout);
 		usleep(50 * 1000); /* 50 ms interval */
@@ -333,7 +333,7 @@ static void *worker(void *arg)
 	s->tid = gettid();
 
 	interval.tv_sec = 0;
-	interval.tv_nsec = sleep_interval_us * NS_PER_US;
+	interval.tv_nsec = sleep_interval_us * NSEC_PER_USEC;
 
 	while (!READ_ONCE(shutdown)) {
 		/* Time critical part starts here */
@@ -355,6 +355,9 @@ static void *worker(void *arg)
 
 		/* Update the statistics */
 		diff = ts_sub(now, next);
+		if (!ns)
+			diff /= NSEC_PER_USEC;
+
 		if (diff > s->max)
 			s->max = diff;
 
@@ -414,13 +417,16 @@ static void create_workers(struct stats *s)
 			t++;
 
 		s[i].min = UINT_MAX;
-		s[i].hist_size = HIST_MAX_ENTRIES;
-		s[i].hist = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
+		s[i].hist_size = hist_size_us;
+		if (ns)
+			s[i].hist_size *= NSEC_PER_USEC;
+		s[i].hist = calloc(s[i].hist_size, sizeof(s[i].hist[0]));
 		if (!s[i].hist)
 			err_handler(errno, "calloc()");
 
 		s[i].hist_overflows_last = 0;
-		s[i].hist_overflows = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
+		s[i].hist_overflows = calloc(s[i].hist_size, 
+			sizeof(s[i].hist_overflows[0]));
 		if (!s[i].hist_overflows)
 			err_handler(errno, "calloc()");
 
@@ -467,6 +473,7 @@ static struct option long_options[] = {
 
 	{ "break",	required_argument,	0,	'b' },
 	{ "interval",	required_argument,	0,	'i' },
+	{ "ns",		no_argument,		0,	'N' },
 	{ "samples",	required_argument,	0,	's' },
 
 	{ "affinity",	required_argument,	0,	'a' },
@@ -489,6 +496,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
 	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
+	printf("      --ns              Count in nanoseconds\n");
 	printf("  -s, --samples FILE    Store all samples in to FILE\n");
 	printf("\n");
 	printf("Threads: \n");
@@ -554,6 +562,11 @@ int main(int argc, char *argv[])
 					  "Default: %u.\n", sleep_interval_us);
 			sleep_interval_us = val;
 			break;
+		case 'N':
+			ns = true;
+			stats_fmt = FMT_THREAD " Min:%8u Max:%14u Avg:%12.2f"
+				    VT100_ERASE_EOL "\n";
+			break;
 		case 's':
 			samples_filename = optarg;
 			break;
@@ -607,6 +620,9 @@ int main(int argc, char *argv[])
 	if (break_val != UINT_MAX)
 		open_trace_fds();
 
+	if (verbose)
+		printf("time unit: %s\n", ns ? "ns" : "us");
+	
 	if (cpus_online(&affinity_available) < 0)
 		err_handler(errno, "cpus_available()");
 
