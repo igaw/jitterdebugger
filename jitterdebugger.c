@@ -587,7 +587,6 @@ int main(int argc, char *argv[])
 			num_threads_per_core = val;
 			break;
 		default:
-			printf("unknown option\n");
 			usage(1);
 		}
 	}
