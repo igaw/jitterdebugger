@@ -150,7 +150,7 @@ static void stop_tracer(uint64_t diff)
 	char buf[128];
 	int len;
 
-	len = snprintf(buf, 128, "Hit latency %lu", diff);
+	len = snprintf(buf, 128, "Hit latency %" PRIu64, diff);
 	write(tracemark_fd, buf, len);
 	write(trace_fd, "0\n", 2);
 }
@@ -223,13 +223,13 @@ static void dump_stats(FILE *f, struct stats *s)
 			if (!s[i].hist[j])
 				continue;
 			fprintf(f, "%s", comma ? ",\n" : "\n");
-			fprintf(f, "        \"%u\": %lu", j, s[i].hist[j]);
+			fprintf(f, "        \"%u\": %" PRIu64,j, s[i].hist[j]);
 			comma = 1;
 		}
 		if (comma)
 			fprintf(f, "\n");
 		fprintf(f, "      },\n");
-		fprintf(f, "      \"count\": %lu,\n", s[i].count);
+		fprintf(f, "      \"count\": %" PRIu64 ",\n", s[i].count);
 		fprintf(f, "      \"min\": %u,\n", s[i].min);
 		fprintf(f, "      \"max\": %u,\n", s[i].max);
 		fprintf(f, "      \"avg\": %.2f\n",

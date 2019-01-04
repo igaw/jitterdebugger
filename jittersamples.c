@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "jitterdebugger.h"
 
@@ -45,7 +46,7 @@ static void dump_samples(const char *filename, int cpuid)
 		if (cpuid >= 0 && sample.cpuid != cpuid)
 			continue;
 
-		printf("%d;%lld.%.9ld;%lu\n",
+		printf("%d;%lld.%.9ld;%" PRIu64 "\n",
 			sample.cpuid,
 			(long long)sample.ts.tv_sec,
 			sample.ts.tv_nsec,
