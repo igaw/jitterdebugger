@@ -1,4 +1,4 @@
-CFLAGS+=-g -Wall -pthread -O3
+CFLAGS+=-Wall -Wstrict-aliasing=1 -Wno-unused-result -pthread -O2
 LDFLAGS+=-pthread
 
 TARGETS=jitterdebugger jittersamples
