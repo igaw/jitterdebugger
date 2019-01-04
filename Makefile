@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 CFLAGS+=-Wall -Wstrict-aliasing=1 -Wno-unused-result -pthread -O2
 LDFLAGS+=-pthread
 

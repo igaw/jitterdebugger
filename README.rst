@@ -1,4 +1,8 @@
+.. SPDX-License-Identifier: MIT
+
+==============
 jitterdebugger
+==============
 
 +------------+------------------+
 |   Branch   |   Build Status   |

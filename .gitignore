@@ -1,3 +1,4 @@
-*.o
+# SPDX-License-Identifier: MIT
+.o
 jitterdebugger
 jittersamples
