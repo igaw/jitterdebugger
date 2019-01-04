@@ -72,6 +72,7 @@ static unsigned int num_threads;
 static unsigned int priority = 80;
 static unsigned int break_val = UINT_MAX;
 static unsigned int sleep_interval_us = 250; /* 250 us interval */
+static unsigned int max_loops = 0;
 static int trace_fd = -1;
 static int tracemark_fd = -1;
 static char *samples_filename;
@@ -353,6 +354,9 @@ static void *worker(void *arg)
 			stop_tracer(diff);
 			WRITE_ONCE(shutdown, 1);
 		}
+
+		if (max_loops > 0 && s->count >= max_loops)
+			break;
 	}
 
 	return NULL;
@@ -449,6 +453,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -f, --file FILE       Store output into FILE\n");
 	printf("\n");
 	printf("Sampling:\n");
+	printf("  -l, --loops VALUE     Max number of measurements\n");
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
 	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
@@ -483,7 +488,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vb:i:s:a:h", long_options, NULL);
+		c = getopt_long(argc, argv, "f:p:vl:b:i:s:a:h", long_options, NULL);
 		if (c < 0)
 			break;
 
@@ -500,6 +505,13 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			verbose = 1;
+			break;
+		case 'l':
+			val = parse_dec(optarg);
+			if (val <= 0)
+				err_abort("Invalid value for loops. "
+					"Valid range is [1..]\n");
+			max_loops = val;
 			break;
 		case 'b':
 			val = parse_dec(optarg);
@@ -601,6 +613,8 @@ int main(int argc, char *argv[])
 		if (err)
 			err_handler(err, "pthread_join()");
 	}
+
+	WRITE_ONCE(shutdown, 1);
 
 	if (samples_filename) {
 		err = pthread_join(iopid, NULL);
