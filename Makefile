@@ -1,5 +1,5 @@
-CFLAGS=-g -Wall -pthread -O3
-LDFLAGS=-pthread
+CFLAGS+=-g -Wall -pthread -O3
+LDFLAGS+=-pthread
 
 TARGETS=jitterdebugger jittersamples
 
