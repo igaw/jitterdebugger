@@ -409,6 +409,7 @@ static void create_workers(struct stats *s)
 static struct option long_options[] = {
 	{ "help",	no_argument,		0,	'h' },
 	{ "verbose",	no_argument,		0,	'v' },
+	{ "version",	no_argument,		0,	 0  },
 	{ "file",	required_argument,	0,	'f' },
 
 	{ "break",	required_argument,	0,	'b' },
@@ -428,6 +429,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("General usage:\n");
 	printf("  -h, --help            Print this help\n");
 	printf("  -v, --verbose         Print live statistics\n");
+	printf("      --version         Print verison of jitterdebugger\n");
 	printf("  -f, --file FILE       Store output into FILE\n");
 	printf("\n");
 	printf("Sampling:\n");
@@ -456,6 +458,7 @@ int main(int argc, char *argv[])
 	uid_t uid, euid;
 	pthread_t pid, iopid;
 	cpu_set_t affinity_available, affinity_set;
+	int long_idx;
 	long val;
 
 	CPU_ZERO(&affinity_set);
@@ -466,11 +469,19 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vl:b:i:s:a:h", long_options, NULL);
+		c = getopt_long(argc, argv, "f:p:vl:b:i:s:a:h", long_options,
+				&long_idx);
 		if (c < 0)
 			break;
 
 		switch (c) {
+		case 0:
+			if (!strcmp(long_options[long_idx].name, "version")) {
+				printf("jitterdebugger %s\n",
+					JD_VERSION);
+				exit(0);
+			}
+			break;
 		case 'f':
 			filename = optarg;
 			break;

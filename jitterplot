@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 
 import sys
@@ -53,6 +54,7 @@ def plot_samples(filename):
 
 def main():
     ap = argparse.ArgumentParser(description='Plot statistics collected with jitterdebugger')
+    ap.add_argument('--version', action='version', version='%(prog)s 0.1')
     sap = ap.add_subparsers(dest='cmd')
 
     hrs = sap.add_parser('hist', help='Print historgram')

@@ -36,6 +36,7 @@ static void dump_samples(const char *filename, int cpuid)
 
 static struct option long_options[] = {
 	{ "help",	no_argument,		0,	'h' },
+	{ "version",	no_argument,		0,	 0  },
 	{ "cpu",	required_argument,	0,	'c' },
 	{ 0, },
 };
@@ -46,6 +47,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("\n");
 	printf("Usage:\n");
 	printf("  -h, --help		Print this help\n");
+	printf("      --version		Print version of jittersamples\n");
 	printf("  -c, --cpu CPUID	Filter CPUID\n");
 
 	exit(status);
@@ -53,16 +55,24 @@ static void __attribute__((noreturn)) usage(int status)
 
 int main(int argc, char *argv[])
 {
+	int long_idx;
 	int cpuid = -1;
 	long val;
 	int c;
 
 	while (1) {
-		c = getopt_long(argc, argv, "hc:", long_options, NULL);
+		c = getopt_long(argc, argv, "hc:", long_options, &long_idx);
 		if (c < 0)
 			break;
 
 		switch (c) {
+		case 0:
+			if (!strcmp(long_options[long_idx].name, "version")) {
+				printf("jittersamples %s\n",
+					JD_VERSION);
+				exit(0);
+			}
+			break;
 		case 'h':
 			usage(0);
 		case 'c':

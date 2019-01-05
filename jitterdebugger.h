@@ -7,6 +7,8 @@
 #include <sched.h>
 #include <time.h>
 
+#define JD_VERSION "0.1"
+
 #define READ_ONCE(x)							\
 ({									\
 	union { typeof(x) __v; char __t[1]; } __u = { .__t = { 0 } };	\
