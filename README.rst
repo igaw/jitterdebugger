@@ -18,4 +18,4 @@ command line options as cyclictest which results are easy to get wrong
 and therefore an invalid latency report.
 
 The default settings of jitterdebugger will produce a correct
-measurrement out of the box.
+measurement out of the box.
