@@ -7,6 +7,7 @@ import csv
 import argparse
 import matplotlib.pyplot as plt
 
+__version__ = '0.1'
 
 def plot_histogram(filename):
     with open(filename) as file:
@@ -54,7 +55,8 @@ def plot_samples(filename):
 
 def main():
     ap = argparse.ArgumentParser(description='Plot statistics collected with jitterdebugger')
-    ap.add_argument('--version', action='version', version='%(prog)s 0.1')
+    ap.add_argument('--version', action='version',
+                    version='%(prog)s ' + __version__)
     sap = ap.add_subparsers(dest='cmd')
 
     hrs = sap.add_parser('hist', help='Print historgram')
