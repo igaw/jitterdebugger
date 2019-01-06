@@ -429,7 +429,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("General usage:\n");
 	printf("  -h, --help            Print this help\n");
 	printf("  -v, --verbose         Print live statistics\n");
-	printf("      --version         Print verison of jitterdebugger\n");
+	printf("      --version         Print version of jitterdebugger\n");
 	printf("  -f, --file FILE       Store output into FILE\n");
 	printf("\n");
 	printf("Sampling:\n");
