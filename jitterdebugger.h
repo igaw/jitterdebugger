@@ -7,7 +7,7 @@
 #include <sched.h>
 #include <time.h>
 
-#define JD_VERSION "0.1"
+#define JD_VERSION "0.2"
 
 #define READ_ONCE(x)							\
 ({									\

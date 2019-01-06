@@ -34,7 +34,7 @@ mv newchangelog CHANGELOG.md
 sed -i "s,\(__version__ =\).*,\1 \'$NEW_VERSION\'," jitterplot
 sed -i "s,\(#define JD_VERSION\).*,\1 \"$NEW_VERSION\"," jitterdebugger.h
 
-git add CHANGELOG.md jitterplot jiterrdebugger.h
+git add CHANGELOG.md jitterplot jitterdebugger.h
 
 git commit -m "Release $NEW_VERSION"
 git tag -s -m "Release $NEW_VERSION" "$NEW_VERSION"
