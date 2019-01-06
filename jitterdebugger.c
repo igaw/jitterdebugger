@@ -192,6 +192,7 @@ static void dump_stats(FILE *f, struct stats *s)
 	unsigned int i, j, comma;
 
 	fprintf(f, "{\n");
+	fprintf(f, "  \"version\": 1,\n");
 	fprintf(f, "  \"cpu\": {\n");
 	for (i = 0; i < num_threads; i++) {
 		fprintf(f, "    \"%u\": {\n", i);
