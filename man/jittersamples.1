@@ -1,0 +1,46 @@
+.TH JITTERSAMPLES 1
+.SH NAME
+jittersamples \- decodes collected samples by jitterdebugger
+.SH SYNOPSIS
+.B jittersamples hist [OPTIONS]
+.SH DESCRIPTION
+.B jittersamples
+prints all samples stored by jitterdebugger to STDOUT.
+
+The output is in CSV (Comma Separated Values) format.
+
+The fields are:
+.IP \[bu]
+CPUID
+.IP \[bu]
+Timestamp in seconds
+.IP \[bu]
+Wake up latency in micro seconds
+.SH OPTIONS
+.TP
+.BI "-h, --help"
+Show help text and exit.
+.TP
+.BI "-c, --CPU" CPUID
+Only print samples from CPU with CPUID.
+.SH EXAMPLES
+.EX
+  # jitterdebugger -s samples.bin
+  ^C
+  # jittersamples samples.bin | head
+  0;1114.936950838;9
+  0;1114.937204763;3
+  0;1114.937458457;3
+  0;1114.937711970;3
+  0;1114.937965595;3
+  0;1114.938218986;3
+  0;1114.938472416;3
+  0;1114.938725788;3
+  0;1114.938979191;3
+  0;1114.939232594;3
+.EE
+.SH SEE ALSO
+.ad l
+.nh
+.BR jitterdebugger (1)
+.BR jitterplot (1)

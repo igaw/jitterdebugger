@@ -1,0 +1,105 @@
+.TH JITTERDEBUGGER 1
+.SH NAME
+jitterdebugger \- measures wake up latencies
+.SH SYNOPSIS
+.B jitterdebugger [OPTIONS]
+.SH DESCRIPTION
+.B jitterdebugger
+measures wake up latencies. jitterdebugger starts a
+thread on each CPU which programs a timer and measures the time it
+takes from the timer expiring until the thread which set the timer
+runs again.
+
+jitterdebugger default settings will produce a correct meassurement.
+
+The program runs until CTRL-C or SIGTERM is received. The results are
+printed to STDOUT as JSON encoded string.
+.SH OPTIONS
+.TP
+.BI "-h, --help"
+Show help text and exit.
+.TP
+.BI "-v, --verbose"
+Show live updates of the measurments
+.TP
+.BI "-f, --file=" FILE
+Write the results into the FILE
+.TP
+.BI "-l, --loops=" N
+Run meassurments N times and the terminate jitterdebugger.
+.TP
+.BI "-b, --break=" N
+Run jitterdebugger until the N or greater latency has been
+observered. jitterdebugger will also stop a running tracer by writing
+0 to tracing/tracing_on. Furthermore, the value observed will be
+written to the trace buffers tracing/trace_marker, e.g "Hit latency
+249".
+.TP
+.BI "-i, --interval=" N
+Set the sleep time between each measuring. The default value is 250us
+.TP
+.BI "-s, --samples=" FILE
+Write all samples measured into FILE. This file is binary encoded and
+can be decoded using jittersamples.
+.TP
+.BI "-a, --affinity=" CPUSET
+Set the CPU affinity mask. jitterdebugger starts only meassuring
+threads on CPUSET,. e.g. 0,2,5-7 starts a thread on first, third and
+5, 6 and 7 CPU.
+May also be set in hexadecimal with '0x' prefix
+.TP
+.BI "-p, --priority=" PRI
+Set the priority of the meassuring threads. The default value is
+98. Note priority 99 is not available because 99 should only be used
+for kernel housekeeping tasks.
+.SH EXAMPLES
+.EX
+# jitterdebugger  -v
+affinity: 0,1 = 2 [0x3]
+T: 0 (  614) A: 0 C:     13476 Min:         3 Max:        10 Avg:    3.08
+T: 1 (  615) A: 1 C:     13513 Min:         3 Max:        20 Avg:    3.10
+^C
+{
+  "cpu": {
+    "0": {
+      "histogram": {
+        "3": 4070,
+        "4": 269,
+        "5": 26,
+        "6": 5,
+        "7": 1,
+        "8": 1,
+        "9": 2,
+        "10": 1
+      },
+      "count": 4375,
+      "min": 3,
+      "max": 10,
+      "avg": 3.08
+    },
+    "1": {
+      "histogram": {
+        "3": 4002,
+        "4": 320,
+        "5": 22,
+        "6": 4,
+        "7": 2,
+        "8": 1,
+        "10": 2,
+        "11": 1,
+        "16": 2,
+        "20": 1
+      },
+      "count": 4357,
+      "min": 3,
+      "max": 20,
+      "avg": 3.10
+    }
+  }
+}
+.EE
+.SH SEE ALSO
+.ad l
+.nh
+.BR jittersamples (1)
+.BR jitterplot (1)

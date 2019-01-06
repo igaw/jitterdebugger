@@ -1,0 +1,37 @@
+.TH JITTERPLOT 1
+.SH NAME
+jitterplot \- plot collected samples by jitterdebugger
+.SH SYNOPSIS
+.B jitterplot [OPTIONS] {hist,samples}
+.SH DESCRIPTION
+.B jittersamples
+procudes plots from the collected samples by jitterdebugger.
+
+hist produces a histogram plot using the default output (JSON encoded)
+from jitterdebugger.
+
+samples procudes a plot using the all the collected samples by
+jitterdebugger in CSV format.
+.SH OPTIONS
+.TP
+.BI "-h, --help"
+Show help text and exit.
+.TP
+.BI "--version"
+Show jitterplot version.
+.SH EXAMPLES
+.EX
+# jitterdebugger -f jd.json
+^C
+# jitterplot hist jd.json
+
+# jitterdebugger -s samples.bin
+^C
+# jittersamples samples.bin > samples.txt
+# jitterplot samples samples.txt
+.EE
+.SH SEE ALSO
+.ad l
+.nh
+.BR jitterdebugger (1)
+.BR jittersamples (1)

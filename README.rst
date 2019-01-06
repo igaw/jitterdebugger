@@ -4,7 +4,10 @@
 jitterdebugger
 ==============
 
-jitterdebugger measures wake up latencies.
+jitterdebugger measures wake up latencies. jitterdebugger starts a
+thread on each CPU which programs a timer and measures the time it
+takes from the timer expiring until the thread which set the timer
+runs again.
 
 This tool is a re-implementation of cyclictest. It doesn't have all the
 command line options as cyclictest which results are easy to get wrong
