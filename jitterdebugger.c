@@ -341,7 +341,7 @@ static void *worker(void *arg)
 	return NULL;
 }
 
-static void create_workers(struct stats *s)
+static void start_measuring(struct stats *s)
 {
 	struct sched_param sched;
 	pthread_attr_t attr;
@@ -584,7 +584,7 @@ int main(int argc, char *argv[])
 	if (!s)
 		err_handler(errno, "calloc()");
 
-	create_workers(s);
+	start_measuring(s);
 
 	if (verbose) {
 		err = pthread_create(&pid, NULL, display_stats, s);
