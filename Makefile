@@ -7,7 +7,7 @@ TARGETS=jitterdebugger jittersamples
 
 all: $(TARGETS)
 
-jitterdebugger: jitterutils.o jitterdebugger.o
+jitterdebugger: jitterutils.o jitterwork.o jitterdebugger.o
 
 jittersamples: jitterutils.o jittersamples.o
 

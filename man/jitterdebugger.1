@@ -26,6 +26,13 @@ Show live updates of the measurments
 .BI "-f, --file=" FILE
 Write the results into the FILE
 .TP
+.BI "-c, --command=" CMD
+Start workload CMD in background, e.g. -c "while true; do; hackbench;
+done". The CMD is executed in a full shell, that means VARIABLE
+expansion works as well. When jitterdebugger terminates itself
+(because of break value or loops), the background workload is also
+terminated.
+.TP
 .BI "-l, --loops=" N
 Run meassurments N times and the terminate jitterdebugger.
 .TP

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <sched.h>
 #include <time.h>
+#include <stdio.h>
 
 #define JD_VERSION "0.3"
 
@@ -63,5 +64,8 @@ void cpuset_from_bits(cpu_set_t *set, unsigned long bits);
 unsigned long cpuset_to_bits(cpu_set_t *set);
 void cpuset_fprint(FILE *f, cpu_set_t *set);
 ssize_t cpuset_parse(cpu_set_t *set, const char *str);
+
+int start_workload(const char *cmd);
+void stop_workload(void);
 
 #endif /* __JITTERDEBUGGER_H */

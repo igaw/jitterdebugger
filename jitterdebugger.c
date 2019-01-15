@@ -432,6 +432,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -v, --verbose         Print live statistics\n");
 	printf("      --version         Print version of jitterdebugger\n");
 	printf("  -f, --file FILE       Store output into FILE\n");
+	printf("  -c, --command CMD	Execute CMD (workload) in background\n");
 	printf("\n");
 	printf("Sampling:\n");
 	printf("  -l, --loops VALUE     Max number of measurements\n");
@@ -466,11 +467,12 @@ int main(int argc, char *argv[])
 
 	/* Command line options */
 	char *filename = NULL;
+	char *command = NULL;
 	FILE *stream = NULL;
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vl:b:i:s:a:h", long_options,
+		c = getopt_long(argc, argv, "f:c:p:vl:b:i:s:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -485,6 +487,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			filename = optarg;
+			break;
+		case 'c':
+			command = optarg;
 			break;
 		case 'p':
 			val = parse_dec(optarg);
@@ -584,6 +589,10 @@ int main(int argc, char *argv[])
 	if (!s)
 		err_handler(errno, "calloc()");
 
+	err = start_workload(command);
+	if (err < 0)
+		err_handler(errno, "starting workload failed");
+
 	start_measuring(s);
 
 	if (verbose) {
@@ -605,6 +614,7 @@ int main(int argc, char *argv[])
 	}
 
 	WRITE_ONCE(shutdown, 1);
+	stop_workload();
 
 	if (samples_filename) {
 		err = pthread_join(iopid, NULL);
