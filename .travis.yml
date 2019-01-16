@@ -4,59 +4,34 @@ language: c
 
 compiler:
   - gcc
-
 matrix:
   include:
     - os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-4.9
-      env:
-         - MATRIX_EVAL="CC=gcc-4.9"
-
+      before_install:
+        - docker pull debian:latest
+        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/igaw/jitterebugger -td debian:latest /bin/bash
+      install:
+        - docker exec -ti travis-ci bash -c "apt-get update"
+        - docker exec -ti travis-ci bash -c "apt-get install -y build-essential git"
     - os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-5
-      env:
-         - MATRIX_EVAL="CC=gcc-5"
-
+      before_install:
+        - docker pull debian:testing
+        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/igaw/jitterebugger -td debian:testing /bin/bash
+      install:
+        - docker exec -ti travis-ci bash -c "apt-get update"
+        - docker exec -ti travis-ci bash -c "apt-get install -y build-essential git"
     - os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-6
-      env:
-        - MATRIX_EVAL="CC=gcc-6"
+      before_install:
+        - docker pull fedora:latest
+        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/igaw/jitterebugger -td fedora:latest /bin/bash
+      install:
+        - docker exec -ti travis-ci bash -c "dnf -y update"
+        - docker exec -ti travis-ci bash -c "dnf -y install @development-tools git"
 
-    - os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-7
-      env:
-        - MATRIX_EVAL="CC=gcc-7"
-
-    - os: linux
-      addons:
-        apt:
-          packages:
-            - gcc-arm-linux-gnueabihf
-            - libc6-dev-armhf-cross
-      env:
-        - MATRIX_EVAL="CC=arm-linux-gnueabihf-gcc"
-
-before_install:
-    - eval "${MATRIX_EVAL}"
-
-script: make
+before_script:
+  - docker exec -ti travis-ci bash -c "cd /igaw && git clone https://github.com/igaw/jitterdebugger"
+  - docker exec -ti travis-ci bash -c "cd /igaw/jitterdebugger && git checkout -qf $TRAVIS_COMMIT"
+script:
+  - docker exec -ti travis-ci bash -c "cd /igaw/jitterdebugger && CC=${CC} CXX=${CXX} make"
+after_script:
+  - docker stop travis-ci
