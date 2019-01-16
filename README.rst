@@ -49,6 +49,7 @@ jitterplot and jittersamples have additional dependency to
 
 - Python3
 - Matlibplot
+- Pandas
 - HDF5 >= 1.8.17
 
 #####

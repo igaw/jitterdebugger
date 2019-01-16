@@ -3,9 +3,9 @@
 
 import sys
 import json
-import csv
 import argparse
 import matplotlib.pyplot as plt
+import pandas as pd
 
 __version__ = '0.3'
 
@@ -35,21 +35,25 @@ def plot_histogram(filename):
     plt.setp(L.texts, family='monospace')
     plt.show()
 
+def load_hdf(filename):
+    df = pd.read_hdf(filename)
+    return df
 
-def plot_samples(filename):
-    x = []
-    y = []
+def plot_all_cpus(df):
+    ids = df["CPUID"].unique()
+    max_jitter = max(df["Value"])
 
-    with open(filename,'r') as csvfile:
-        plots = csv.reader(csvfile, delimiter=';')
-        for row in plots:
-            x.append(float(row[1]))
-            y.append(int(row[2]))
-
-    plt.plot(x,y)
-    plt.xlabel('timestamp')
-    plt.ylabel('latency (us)')
-    plt.legend()
+    fig = plt.figure()
+    axes = fig.subplots(len(ids))
+    for ax, data in zip(
+        iter(axes),
+        (df[df["CPUID"] == id] for id in ids),
+    ):
+        data["Time"] = data["Seconds"] + data["Nanoseconds"] * 10**-9
+        ax.plot("Time", "Value", data=data)
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Latency [us]")
+        ax.set_ylim(ymin=0, ymax=max_jitter)
     plt.show()
 
 
@@ -69,7 +73,8 @@ def main():
     if args.cmd == 'hist':
         plot_histogram(args.HIST_FILE)
     elif args.cmd == 'samples':
-        plot_samples(args.SAMPLE_FILE)
+        df = load_hdf(args.SAMPLE_FILE)
+        plot_all_cpus(df)
 
 if __name__ == '__main__':
     main()
