@@ -11,7 +11,7 @@
 
 #include "jitterdebugger.h"
 
-static void dump_samples(const char *filename, int cpuid)
+static void dump_samples(const char *filename)
 {
 	struct latency_sample sample;
 	FILE *file;
@@ -21,9 +21,6 @@ static void dump_samples(const char *filename, int cpuid)
 		return;
 
 	while(fread(&sample, sizeof(struct latency_sample), 1, file)) {
-		if (cpuid >= 0 && sample.cpuid != cpuid)
-			continue;
-
 		printf("%d;%lld.%.9ld;%" PRIu64 "\n",
 			sample.cpuid,
 			(long long)sample.ts.tv_sec,
@@ -37,7 +34,6 @@ static void dump_samples(const char *filename, int cpuid)
 static struct option long_options[] = {
 	{ "help",	no_argument,		0,	'h' },
 	{ "version",	no_argument,		0,	 0  },
-	{ "cpu",	required_argument,	0,	'c' },
 	{ 0, },
 };
 
@@ -48,7 +44,6 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("Usage:\n");
 	printf("  -h, --help		Print this help\n");
 	printf("      --version		Print version of jittersamples\n");
-	printf("  -c, --cpu CPUID	Filter CPUID\n");
 
 	exit(status);
 }
@@ -56,12 +51,10 @@ static void __attribute__((noreturn)) usage(int status)
 int main(int argc, char *argv[])
 {
 	int long_idx;
-	int cpuid = -1;
-	long val;
 	int c;
 
 	while (1) {
-		c = getopt_long(argc, argv, "hc:", long_options, &long_idx);
+		c = getopt_long(argc, argv, "h", long_options, &long_idx);
 		if (c < 0)
 			break;
 
@@ -75,13 +68,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'h':
 			usage(0);
-		case 'c':
-			val = parse_dec(optarg);
-			if (val < 0)
-				err_abort("Invalid value for CPUID. "
-					  "Valid range is [0..]\n");
-			cpuid = val;
-			break;
 		default:
 			printf("unknown option\n");
 			usage(1);
@@ -93,7 +79,7 @@ int main(int argc, char *argv[])
 		usage(1);
 	}
 
-	dump_samples(argv[optind], cpuid);
+	dump_samples(argv[optind]);
 
 	return 0;
 }
