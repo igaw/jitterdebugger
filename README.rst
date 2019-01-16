@@ -184,9 +184,9 @@ output into a file.
 
 ::
 
-  # jitterdebugger -f jd.data
+  # jitterdebugger -f results.json
   ^C
-  # jitterplot hist jd.data
+  # jitterplot hist results.json
 
 
 #################
@@ -198,9 +198,9 @@ processing use jittersamples to print data as normal ASCII output:
 
 ::
 
-  # jitterdebugger -s samples.bin
+  # jitterdebugger -o samples.raw
   ^C
-  # jittersamples samples.bin | head
+  # jittersamples samples.raw | head
   0;1114.936950838;9
   0;1114.937204763;3
   0;1114.937458457;3

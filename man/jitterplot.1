@@ -22,13 +22,13 @@ Show help text and exit.
 Show jitterplot version.
 .SH EXAMPLES
 .EX
-# jitterdebugger -f jd.json
+# jitterdebugger -f results.json
 ^C
-# jitterplot hist jd.json
+# jitterplot hist results.json
 
-# jitterdebugger -s samples.bin
+# jitterdebugger -o samples.raw
 ^C
-# jittersamples samples.bin > samples.txt
+# jittersamples samples.raw > samples.txt
 # jitterplot samples samples.txt
 .EE
 .SH SEE ALSO
