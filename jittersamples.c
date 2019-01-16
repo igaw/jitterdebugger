@@ -82,7 +82,7 @@ static void output_hdf5(FILE *input, const char *ofile)
 		err_handler(EIO,
 			"failed to add type info to HDF5 compound type");
 
-	set = H5PTcreate(file, "jitterdebugger samples",
+	set = H5PTcreate(file, "jitterdebugger",
 			type, (hsize_t)bs, H5P_DEFAULT);
 	if (set == H5I_INVALID_HID)
 		err_handler(EIO,
