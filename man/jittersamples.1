@@ -6,9 +6,10 @@ jittersamples \- decodes collected samples by jitterdebugger
 .B jittersamples hist [OPTIONS]
 .SH DESCRIPTION
 .B jittersamples
-prints all samples stored by jitterdebugger to STDOUT.
+prints all samples stored by jitterdebugger to standard output.
 
-The output is in CSV (Comma Separated Values) format.
+The input file is expected to be in raw format. The default output is
+in CSV (Comma Separated Values) format.
 
 The fields are:
 .IP \[bu]
@@ -21,6 +22,13 @@ Wake up latency in micro seconds
 .TP
 .BI "-h, --help"
 Show help text and exit.
+.TP
+.BI "-f, --format" FMT
+Set output format. Supported formats are CSV and HDF5. For HDF5 an
+output file has to be provided via --output command line.
+.TP
+.BI "-o, --output" FILE
+Write data to FILE instead to STDOUT.
 .SH EXAMPLES
 .EX
   # jitterdebugger -o samples.raw

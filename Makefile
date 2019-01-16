@@ -9,7 +9,11 @@ all: $(TARGETS)
 
 jitterdebugger: jitterutils.o jitterwork.o jitterdebugger.o
 
-jittersamples: jitterutils.o jittersamples.o
+jittersamples: export HDF5_CC=${CC}
+jittersamples: jitterutils.c jittersamples.c
+	h5cc ${CFLAGS} -c jitterutils.c
+	h5cc ${CFLAGS} -c jittersamples.c
+	h5cc -shlib jitterutils.o jittersamples.o -o jittesamples
 
 PHONY: .clean
 clean:

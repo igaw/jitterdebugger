@@ -37,6 +37,19 @@ Build status
 .. |travis-next| image:: https://travis-ci.org/igaw/jitterdebugger.svg?branch=next
 .. _travis-next: https://travis-ci.org/igaw/jitterdebugger/branches
 
+#################
+Runtime Depenency
+#################
+
+jitterdebugger has only dependency to glibc (incl pthread).
+
+- glibc >= 2.24
+
+jitterplot and jittersamples have additional dependency to
+
+- Python3
+- Matlibplot
+- HDF5 >= 1.8.17
 
 #####
 Usage
