@@ -438,7 +438,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
 	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
-	printf("  -s, --samples FILE    Store all samples in to FILE\n");
+	printf("  -o, --output FILE     Store all samples in to FILE (raw format)\n");
 	printf("\n");
 	printf("Threads: \n");
 	printf("  -a, --affinity CPUSET Core affinity specification\n");
@@ -470,7 +470,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:p:vl:b:i:s:a:h", long_options,
+		c = getopt_long(argc, argv, "f:p:vl:b:i:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -518,7 +518,7 @@ int main(int argc, char *argv[])
 					  "Default: %u.\n", sleep_interval_us);
 			sleep_interval_us = val;
 			break;
-		case 's':
+		case 'o':
 			samples_filename = optarg;
 			break;
 		case 'h':
