@@ -13,7 +13,7 @@ jittersamples: export HDF5_CC=${CC}
 jittersamples: jitterutils.c jittersamples.c
 	h5cc ${CFLAGS} -c jitterutils.c
 	h5cc ${CFLAGS} -c jittersamples.c
-	h5cc -shlib jitterutils.o jittersamples.o -o jittesamples
+	h5cc -shlib jitterutils.o jittersamples.o -o jittersamples
 
 PHONY: .clean
 clean:
