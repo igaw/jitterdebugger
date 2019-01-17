@@ -93,7 +93,8 @@ static void output_hdf5(FILE *input, const char *ofile)
 		if (nr != bs) {
 			if (feof(input))
 				break;
-			err_handler(errno, "fread()");
+			if (ferror(input))
+				err_handler(errno, "fread()");
 		}
 		H5PTappend(set, bs, data);
 	}
