@@ -10,6 +10,9 @@
 
 #define JD_VERSION "0.3"
 
+// Results in a 1400 bytes payload per UDP packet
+#define SAMPLES_PER_PACKET 50
+
 #define READ_ONCE(x)							\
 ({									\
 	union { typeof(x) __v; char __t[1]; } __u = { .__t = { 0 } };	\

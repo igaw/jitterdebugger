@@ -8,6 +8,9 @@
 #include <limits.h>
 #include <string.h>
 #include <inttypes.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include <hdf5.h>
 #include <H5PTpublic.h>
@@ -106,11 +109,65 @@ static void output_hdf5(FILE *input, const char *ofile)
 	H5Fclose(file);
 }
 
+static void store_samples(const char *file, const char *port)
+{
+	struct addrinfo hints, *res, *tmp;
+	struct latency_sample sp[SAMPLES_PER_PACKET];
+	ssize_t len;
+	size_t wlen;
+	int err, sk;
+	FILE *fd;
+
+	bzero(&hints, sizeof(struct addrinfo));
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+
+	err = getaddrinfo(NULL, port, &hints, &res);
+	if (err < 0)
+		err_handler(errno, "getaddrinfo()");
+
+	tmp = res;
+	do {
+		sk = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (sk < 0)
+			continue;
+		err = bind(sk, res->ai_addr, res->ai_addrlen);
+		if (err == 0)
+			break;
+
+		close(sk);
+		res = res->ai_next;
+	} while(res);
+
+	freeaddrinfo(tmp);
+
+	fd = fopen(file, "w");
+	if (!fd)
+		err_handler(errno, "fopen()");
+
+	while (1) {
+		len = recvfrom(sk, sp, sizeof(sp), 0, NULL, NULL);
+		if (len != sizeof(sp)) {
+			warn_handler("UDP packet has wrong size\n");
+			continue;
+		}
+		wlen = fwrite(sp, sizeof(sp), 1, fd);
+		if (wlen < 0)
+			err_handler(errno, "fwrite()");
+	}
+
+	fclose(fd);
+	close(sk);
+}
+
 static struct option long_options[] = {
 	{ "help",	no_argument,		0,	'h' },
 	{ "version",	no_argument,		0,	 0  },
 	{ "format",	required_argument,	0,	'f' },
 	{ "output",	required_argument,	0,	'o' },
+	{ "listen",	required_argument,	0,	'l' },
 	{ 0, },
 };
 
@@ -124,6 +181,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("      --version		Print version of jittersamples\n");
 	printf("  -f, --format FMT	Exporting samples in format [cvs, hdf5]\n");
 	printf("  -o, --output FILE	Write output into FILE\n");
+	printf("  -l, --listen PORT	Listen on PORT an write samples into FILE\n");
 
 	exit(status);
 }
@@ -131,14 +189,15 @@ static void __attribute__((noreturn)) usage(int status)
 int main(int argc, char *argv[])
 {
 	FILE *input, *output;
-	char *ifile, *ofile;
+	char *file, *ofile;
 	int long_idx;
 	int c;
 	char *format = "cvs";
+	char *port = NULL;
 
 	ofile = "-";
 	while (1) {
-		c = getopt_long(argc, argv, "hf:o:", long_options, &long_idx);
+		c = getopt_long(argc, argv, "hf:o:l:", long_options, &long_idx);
 		if (c < 0)
 			break;
 
@@ -158,6 +217,9 @@ int main(int argc, char *argv[])
 		case 'o':
 			ofile = optarg;
 			break;
+		case 'l':
+			port = optarg;
+			break;
 		default:
 			printf("unknown option\n");
 			usage(1);
@@ -165,13 +227,18 @@ int main(int argc, char *argv[])
 	}
 
 	if (optind == argc) {
-		fprintf(stderr, "Missing filename\n");
+		fprintf(stderr, "Missing input file\n");
 		usage(1);
 	}
 
-	ifile = argv[optind];
+	file = argv[optind];
 
-	input = fopen(ifile, "r");
+	if (port) {
+		store_samples(file, port);
+		exit(0);
+	}
+
+	input = fopen(file, "r");
 	if (!input)
 		err_handler(errno, "fopen()");
 

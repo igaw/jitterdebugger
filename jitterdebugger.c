@@ -20,6 +20,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <linux/limits.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "jitterdebugger.h"
 
@@ -44,7 +49,14 @@ struct stats {
 	struct ringbuffer *rb;
 };
 
-static int shutdown;
+struct record_data {
+	struct stats *stats;
+	char *filename;
+	char *server;
+	char *port;
+};
+
+static int jd_shutdown;
 static cpu_set_t affinity;
 static unsigned int num_threads;
 static unsigned int priority = 80;
@@ -53,11 +65,10 @@ static unsigned int sleep_interval_us = 250; /* 250 us interval */
 static unsigned int max_loops = 0;
 static int trace_fd = -1;
 static int tracemark_fd = -1;
-static char *samples_filename;
 
 static void sig_handler(int sig)
 {
-	WRITE_ONCE(shutdown, 1);
+	WRITE_ONCE(jd_shutdown, 1);
 }
 
 static inline int64_t ts_sub(struct timespec t1, struct timespec t2)
@@ -228,7 +239,7 @@ static void *display_stats(void *arg)
 	for (i = 0; i < num_threads; i++)
 		printf("\n");
 
-	while (!READ_ONCE(shutdown)) {
+	while (!READ_ONCE(jd_shutdown)) {
 		printf(VT100_CURSOR_UP, num_threads);
 
 		for (i = 0; i < num_threads; i++) {
@@ -249,18 +260,18 @@ static void *display_stats(void *arg)
 	return NULL;
 }
 
-static void *store_samples(void *arg)
+static void store_file(struct record_data *rec)
 {
-	struct stats *s = arg;
+	struct stats *s = rec->stats;
 	FILE *file;
 	struct latency_sample sample;
 	int i;
 
-	file = fopen(samples_filename, "w");
+	file = fopen(rec->filename, "w");
 	if (!file)
 		err_handler(errno, "fopen()");
 
-	while (!READ_ONCE(shutdown)) {
+	while (!READ_ONCE(jd_shutdown)) {
 		for (i = 0; i < num_threads; i++) {
 			sample.cpuid = i;
 			while (!ringbuffer_read(s[i].rb, &sample.ts, &sample.val)) {
@@ -272,6 +283,75 @@ static void *store_samples(void *arg)
 	}
 
 	fclose(file);
+}
+
+static void store_network(struct record_data *rec)
+{
+	struct latency_sample sp[SAMPLES_PER_PACKET];
+	struct addrinfo hints, *res, *tmp;
+	struct sockaddr *sa;
+	socklen_t salen;
+	int len, err, sk, i, c;
+	struct stats *s = rec->stats;
+
+	bzero(&hints, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+
+	err = getaddrinfo(rec->server, rec->port, &hints, &res);
+	if (err < 0)
+		err_handler(err, "getaddrinfo()");
+
+	tmp = res;
+	do {
+		sk = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (sk >= 0)
+			break;
+		res = res->ai_next;
+	} while (res);
+	if (sk < 0)
+		err_handler(ENOENT, "no server");
+
+	sa = malloc(res->ai_addrlen);
+	memcpy(sa, res->ai_addr, res->ai_addrlen);
+	salen = res->ai_addrlen;
+
+	freeaddrinfo(tmp);
+
+	err = fcntl(sk, F_SETFL, O_NONBLOCK, 1);
+	if (err < 0)
+		err_handler(errno, "fcntl");
+
+	c = 0;
+	while (!READ_ONCE(jd_shutdown)) {
+		for (i = 0; i < num_threads; i++) {
+			while (!ringbuffer_read(s[i].rb, &sp[c].ts, &sp[c].val)) {
+				sp[c].cpuid = i;
+				if (c == SAMPLES_PER_PACKET - 1) {
+					len = sendto(sk, (const void *)sp, sizeof(sp), 0,
+						sa, salen);
+					if (len < 0)
+						perror("sendto");
+					c = 0;
+				} else
+					c++;
+			}
+		}
+
+		usleep(250); /* 250 us interval */
+	}
+
+	close(sk);
+}
+
+static void *store_samples(void *arg)
+{
+	struct record_data *rec = arg;
+	if (rec->filename)
+		store_file(rec);
+	else
+		store_network(rec);
 
 	return NULL;
 }
@@ -294,7 +374,7 @@ static void *worker(void *arg)
 	interval.tv_sec = 0;
 	interval.tv_nsec = sleep_interval_us * NSEC_PER_US;
 
-	while (!READ_ONCE(shutdown)) {
+	while (!READ_ONCE(jd_shutdown)) {
 		/* Time critical part starts here */
 		err = clock_gettime(CLOCK_MONOTONIC, &now);
 		if (err)
@@ -331,7 +411,7 @@ static void *worker(void *arg)
 
 		if (diff > break_val) {
 			stop_tracer(diff);
-			WRITE_ONCE(shutdown, 1);
+			WRITE_ONCE(jd_shutdown, 1);
 		}
 
 		if (max_loops > 0 && s->count >= max_loops)
@@ -341,7 +421,7 @@ static void *worker(void *arg)
 	return NULL;
 }
 
-static void start_measuring(struct stats *s)
+static void start_measuring(struct stats *s, int record)
 {
 	struct sched_param sched;
 	pthread_attr_t attr;
@@ -371,7 +451,7 @@ static void start_measuring(struct stats *s)
 		if (!s[i].hist)
 			err_handler(errno, "calloc()");
 
-		if (samples_filename) {
+		if (record) {
 			s[i].rb = ringbuffer_create(1024 * 1024);
 			if (!s[i].rb)
 				err_handler(ENOMEM, "ringbuffer_create()");
@@ -413,6 +493,7 @@ static struct option long_options[] = {
 	{ "version",	no_argument,		0,	 0  },
 	{ "file",	required_argument,	0,	'f' },
 	{ "command",	required_argument,	0,	'c' },
+	{ NULL,		required_argument,	0,	'N' },
 
 	{ "break",	required_argument,	0,	'b' },
 	{ "interval",	required_argument,	0,	'i' },
@@ -464,12 +545,15 @@ int main(int argc, char *argv[])
 	cpu_set_t affinity_available, affinity_set;
 	int long_idx;
 	long val;
+	struct record_data *rec = NULL;
 
 	CPU_ZERO(&affinity_set);
 
 	/* Command line options */
-	char *filename = NULL;
+	char *output = NULL;
 	char *command = NULL;
+	char *samples = NULL;
+	char *network = NULL;
 	FILE *stream = NULL;
 	int verbose = 0;
 
@@ -488,10 +572,13 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'f':
-			filename = optarg;
+			output = optarg;
 			break;
 		case 'c':
 			command = optarg;
+			break;
+		case 'N':
+			network = optarg;
 			break;
 		case 'p':
 			val = parse_dec(optarg);
@@ -526,7 +613,7 @@ int main(int argc, char *argv[])
 			sleep_interval_us = val;
 			break;
 		case 'o':
-			samples_filename = optarg;
+			samples = optarg;
 			break;
 		case 'h':
 			usage(0);
@@ -595,16 +682,31 @@ int main(int argc, char *argv[])
 	if (err < 0)
 		err_handler(errno, "starting workload failed");
 
-	start_measuring(s);
+	start_measuring(s, network || samples);
 
-	if (verbose) {
-		err = pthread_create(&pid, NULL, display_stats, s);
+	if (network || samples) {
+		rec = malloc(sizeof(*rec));
+		if (!rec)
+			err_handler(ENOMEM, "malloc()");
+
+		if (network) {
+			rec->server = strtok(network, " :");
+			rec->port = strtok(NULL, " :");
+
+			if (!rec->server || !rec->port) {
+				fprintf(stdout, "Invalid server name and/or port string\n");
+				exit(1);
+			}
+		}
+		rec->filename = samples;
+		rec->stats = s;
+		err = pthread_create(&iopid, NULL, store_samples, rec);
 		if (err)
 			err_handler(err, "pthread_create()");
 	}
 
-	if (samples_filename) {
-		err = pthread_create(&iopid, NULL, store_samples, s);
+	if (verbose) {
+		err = pthread_create(&pid, NULL, display_stats, s);
 		if (err)
 			err_handler(err, "pthread_create()");
 	}
@@ -615,13 +717,15 @@ int main(int argc, char *argv[])
 			err_handler(err, "pthread_join()");
 	}
 
-	WRITE_ONCE(shutdown, 1);
+	WRITE_ONCE(jd_shutdown, 1);
 	stop_workload();
 
-	if (samples_filename) {
+	if (rec) {
 		err = pthread_join(iopid, NULL);
 		if (err)
 			err_handler(err, "pthread_join()");
+
+		free(rec);
 	}
 
 	if (verbose) {
@@ -632,10 +736,10 @@ int main(int argc, char *argv[])
 
 	printf("\n");
 
-	if (filename) {
-		stream = fopen(filename, "w");
+	if (output) {
+		stream = fopen(output, "w");
 		if (!stream)
-			warn_handler("Could not open file '%s'", filename);
+			warn_handler("Could not open file '%s'", output);
 	}
 	if (!stream)
 		stream = stdout;
