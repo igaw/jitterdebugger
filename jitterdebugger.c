@@ -412,6 +412,7 @@ static struct option long_options[] = {
 	{ "verbose",	no_argument,		0,	'v' },
 	{ "version",	no_argument,		0,	 0  },
 	{ "file",	required_argument,	0,	'f' },
+	{ "command",	required_argument,	0,	'c' },
 
 	{ "break",	required_argument,	0,	'b' },
 	{ "interval",	required_argument,	0,	'i' },
@@ -433,6 +434,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("      --version         Print version of jitterdebugger\n");
 	printf("  -f, --file FILE       Store output into FILE\n");
 	printf("  -c, --command CMD	Execute CMD (workload) in background\n");
+	printf("  -N			host:port to connect to\n");
 	printf("\n");
 	printf("Sampling:\n");
 	printf("  -l, --loops VALUE     Max number of measurements\n");
@@ -472,7 +474,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:c:p:vl:b:i:o:a:h", long_options,
+		c = getopt_long(argc, argv, "f:c:N:p:vl:b:i:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
