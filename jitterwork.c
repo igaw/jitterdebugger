@@ -24,7 +24,11 @@ int start_workload(const char *cmd)
 	if (bpid < 0)
 		return errno;
 
-	printf("start background workload: \"%s\"\n", cmd);
+	err = setpgid(0,0);
+	if (err)
+		err_handler(errno, "setpgid()");
+
+	printf("start background workload: %s\n", cmd);
 	err = execl("/bin/sh", "sh", "-c", cmd, (char *)0);
 	if (err) {
 		err_handler(err, "execl()");
@@ -42,7 +46,7 @@ void stop_workload(void)
 	if (bpid == 0)
 		return;
 
-	err = kill(bpid, SIGTERM);
+	err = killpg(bpid, SIGTERM);
 	if (err)
 		err_handler(errno, "kill()");
 
