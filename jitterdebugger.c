@@ -233,14 +233,13 @@ static void *display_stats(void *arg)
 
 		for (i = 0; i < num_threads; i++) {
 			printf("T:%2u (%5lu) A:%2u C:%10" PRIu64
-				" Min:%10u Max:%10u Avg:%8.2f "
+				" Min:%10u Avg:%8.2f Max:%10u "
 				VT100_ERASE_EOL "\n",
 				i, (long)s[i].tid, s[i].affinity,
 				s[i].count,
 				s[i].min,
-				s[i].max,
-				(double) s[i].total /
-				(double) s[i].count);
+				(double) s[i].total / (double) s[i].count,
+				s[i].max);
 		}
 		fflush(stdout);
 		usleep(50 * 1000); /* 50 ms interval */
