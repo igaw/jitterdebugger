@@ -247,7 +247,7 @@ static void *display_stats(void *arg)
 				" Min:%10u Max:%10u Avg:%8.2f "
 				VT100_ERASE_EOL "\n",
 				i, (long)s[i].tid, s[i].affinity,
-				s[i].total,
+				s[i].count,
 				s[i].min,
 				s[i].max,
 				(double) s[i].total /
