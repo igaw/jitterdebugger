@@ -167,25 +167,16 @@ The measurement loop does following:
 
 ::
 
+  next = clock_gettime(CLOCK_MONOTONIC) + 250us
   while not terminated:
-    now1 = clock_gettime()
-    next = now1+ 250us
+    next = next + 250us
 
-    clock_nanosleep(250us)
+    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, next)
 
-    now2 = clock_gettime()
-    diff = now2 - next
+    now = clock_gettime()
+    diff = now - next
 
     store(diff)
-
-In a perfect world now2 would be the same value as now1 +
-250us. Though there is overhead involved going to sleep and waking up
-again. How long it takes to going to sleep is normally not an
-interesting number for real time application. Instead real time
-application are interested to have a very short reaction time on
-events. Therefore, jitterdebugger measures the time it takes to get
-back to the user application (wake up latency) after the hardware
-timer has fired.
 
 
 ##############
