@@ -374,23 +374,23 @@ static void *worker(void *arg)
 	interval.tv_sec = 0;
 	interval.tv_nsec = sleep_interval_us * NSEC_PER_US;
 
+	err = clock_gettime(CLOCK_MONOTONIC, &now);
+	if (err)
+		err_handler(err, "clock_gettime()");
+
+	next = ts_add(now, interval);
+
 	while (!READ_ONCE(jd_shutdown)) {
-		/* Time critical part starts here */
-		err = clock_gettime(CLOCK_MONOTONIC, &now);
-		if (err)
-			err_handler(err, "clock_gettime()");
+		next = ts_add(next, interval);
 
-		next = ts_add(now, interval);
-
-		err = clock_nanosleep(CLOCK_MONOTONIC, 0,
-					&interval, NULL);
+		err = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
+					&next, NULL);
 		if (err)
 			err_handler(err, "clock_nanosleep()");
 
 		err = clock_gettime(CLOCK_MONOTONIC, &now);
 		if (err)
 			err_handler(err, "clock_gettime()");
-		/* Time ciritcal part ends here */
 
 		/* Update the statistics */
 		diff = ts_sub(now, next);
