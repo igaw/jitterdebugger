@@ -497,9 +497,10 @@ static struct option long_options[] = {
 	{ "command",	required_argument,	0,	'c' },
 	{ NULL,		required_argument,	0,	'N' },
 
+	{ "loops",	required_argument,	0,	'l' },
 	{ "break",	required_argument,	0,	'b' },
 	{ "interval",	required_argument,	0,	'i' },
-	{ "samples",	required_argument,	0,	's' },
+	{ "output",	required_argument,	0,	'o' },
 
 	{ "affinity",	required_argument,	0,	'a' },
 	{ "priority",	required_argument,	0,	'p' },
