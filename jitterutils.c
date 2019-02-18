@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "jitterdebugger.h"
 
@@ -134,6 +135,48 @@ long int parse_num(const char *str, int base, size_t *len)
 		*len = endptr - str;
 
 	return ret;
+}
+
+long int parse_timeout(const char *str)
+{
+	long int time;
+	size_t len;
+	int factor = 1;
+	char c, *buf;
+
+	len = strlen(str);
+	if (len < 1)
+		return -EINVAL;
+
+	c = tolower(str[len-1]);
+	switch (c) {
+	case 'd':
+		factor = 24;
+	case 'h':
+		factor *= 60;
+	case 'm':
+		factor *= 60;
+	case 's':
+		break;
+	default:
+		if (isalpha(c))
+			return -EINVAL;
+		break;
+	}
+
+	buf = strdup(str);
+	if (!buf)
+		return -ENOMEM;
+
+	if (factor > 1)
+		buf[len - 1] = '\0';
+
+	time = parse_num(buf, 10, &len);
+	free(buf);
+
+	if (time < 0)
+		return time;
+	return time * factor;
 }
 
 /* cpu_set_t helpers */

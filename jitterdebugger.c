@@ -522,6 +522,8 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("\n");
 	printf("Sampling:\n");
 	printf("  -l, --loops VALUE     Max number of measurements\n");
+	printf("  -t, --timeout TIME    Run test for TIME in seconds.\n");
+	printf("			Allowed postfixes 'd', 'h', 'm', 's'\n");
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
 	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
@@ -553,6 +555,7 @@ int main(int argc, char *argv[])
 	CPU_ZERO(&affinity_set);
 
 	/* Command line options */
+	unsigned int timeout = 0;
 	char *output = NULL;
 	char *command = NULL;
 	char *samples = NULL;
@@ -561,7 +564,7 @@ int main(int argc, char *argv[])
 	int verbose = 0;
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:c:N:p:vl:b:i:o:a:h", long_options,
+		c = getopt_long(argc, argv, "f:c:N:p:vt:l:b:i:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -592,6 +595,13 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			verbose = 1;
+			break;
+		case 't':
+			val = parse_timeout(optarg);
+			if (val < 0)
+				err_abort("Invalid value for timeout. "
+					"Valid postfixes are 'd', 'h', 'm', 's'\n");
+			timeout = val;
 			break;
 		case 'l':
 			val = parse_dec(optarg);
@@ -646,6 +656,12 @@ int main(int argc, char *argv[])
 
 	if (sigaction(SIGTERM, &sa, NULL) < 0)
 		err_handler(errno, "sigaction()");
+
+	if (sigaction(SIGALRM, &sa, NULL) < 0)
+		err_handler(errno, "sigaction()");
+
+	if (timeout > 0)
+		alarm(timeout);
 
 	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
 		if (errno == ENOMEM || errno == EPERM)
