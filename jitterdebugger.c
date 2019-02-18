@@ -35,6 +35,9 @@
 #define NSEC_PER_US		1000UL
 #define HIST_MAX_ENTRIES	1000
 
+/* Default test interval in us */
+#define DEFAULT_INTERVAL        1000
+
 struct stats {
 	pthread_t pid;
 	pid_t tid;
@@ -61,7 +64,7 @@ static cpu_set_t affinity;
 static unsigned int num_threads;
 static unsigned int priority = 80;
 static unsigned int break_val = UINT_MAX;
-static unsigned int sleep_interval_us = 250; /* 250 us interval */
+static unsigned int sleep_interval_us = DEFAULT_INTERVAL;
 static unsigned int max_loops = 0;
 static int trace_fd = -1;
 static int tracemark_fd = -1;
@@ -278,7 +281,7 @@ static void store_file(struct record_data *rec)
 			}
 		}
 
-		usleep(250); /* 250 us interval */
+		usleep(DEFAULT_INTERVAL);
 	}
 
 	fclose(file);
@@ -338,7 +341,7 @@ static void store_network(struct record_data *rec)
 			}
 		}
 
-		usleep(250); /* 250 us interval */
+		usleep(DEFAULT_INTERVAL);
 	}
 
 	close(sk);
