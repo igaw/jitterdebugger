@@ -167,9 +167,9 @@ The measurement loop does following:
 
 ::
 
-  next = clock_gettime(CLOCK_MONOTONIC) + 250us
+  next = clock_gettime(CLOCK_MONOTONIC) + 1000us
   while not terminated:
-    next = next + 250us
+    next = next + 1000us
 
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, next)
 
