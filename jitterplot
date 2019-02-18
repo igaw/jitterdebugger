@@ -22,11 +22,11 @@ def plot_histogram(filename):
         cid = str(cpu_id)
         data = rawdata['cpu'][cid]
         d = {int(k): int(v) for k, v in data['histogram'].items()}
-        l = 'cpu{} max{:>3} avg{:>5} min{:>3}'.format(
+        l = 'cpu{} min{:>3} avg{:>7} max{:>3}'.format(
             cid,
-            rawdata['cpu'][cid]['max'],
+            rawdata['cpu'][cid]['min'],
             rawdata['cpu'][cid]['avg'],
-            rawdata['cpu'][cid]['min'])
+            rawdata['cpu'][cid]['max'])
         ax.bar(list(d.keys()), list(d.values()), log=True, alpha=0.5, label=l)
 
         cpu_id = cpu_id + 1
