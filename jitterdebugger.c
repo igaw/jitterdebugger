@@ -256,7 +256,7 @@ static void *display_stats(void *arg)
 				s[i].max);
 		}
 		fflush(stdout);
-		usleep(50 * 1000); /* 50 ms interval */
+		usleep(100 * 1000); /* 100 ms interval */
 	}
 
 	return NULL;
