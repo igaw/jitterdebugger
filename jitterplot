@@ -7,7 +7,7 @@ import csv
 import argparse
 import matplotlib.pyplot as plt
 
-__version__ = '0.3'
+__version__ = '0.3.1'
 
 def plot_histogram(filename):
     with open(filename) as file:
