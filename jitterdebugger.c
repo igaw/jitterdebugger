@@ -517,6 +517,8 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -v, --verbose         Print live statistics\n");
 	printf("      --version         Print version of jitterdebugger\n");
 	printf("  -f, --file FILE       Store output into FILE\n");
+	printf("  -o, --output DIR      Store all samples and meta information into DIR\n");
+	printf("                        Overwrites -f option with 'results.json'\n");
 	printf("  -c, --command CMD	Execute CMD (workload) in background\n");
 	printf("  -N			host:port to connect to\n");
 	printf("\n");
@@ -527,7 +529,6 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
 	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
-	printf("  -o, --output FILE     Store all samples in to FILE (raw format)\n");
 	printf("\n");
 	printf("Threads: \n");
 	printf("  -a, --affinity CPUSET Core affinity specification\n");
@@ -550,15 +551,16 @@ int main(int argc, char *argv[])
 	cpu_set_t affinity_available, affinity_set;
 	int long_idx;
 	long val;
+	char *fname;
 	struct record_data *rec = NULL;
 	FILE *rfd = NULL;
 
 	/* Command line options */
 	unsigned int opt_timeout = 0;
 	char *opt_file = NULL;
+	char *opt_dir = NULL;
 	char *opt_cmd = NULL;
 	char *opt_net = NULL;
-	char *opt_samples = NULL;
 	int opt_verbose = 0;
 
 	CPU_ZERO(&affinity_set);
@@ -579,6 +581,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			opt_file = optarg;
+			break;
+		case 'o':
+			opt_file = "results.json";
+			opt_dir = optarg;
 			break;
 		case 'c':
 			opt_cmd = optarg;
@@ -625,9 +631,6 @@ int main(int argc, char *argv[])
 					  "Default: %u.\n", sleep_interval_us);
 			sleep_interval_us = val;
 			break;
-		case 'o':
-			opt_samples = optarg;
-			break;
 		case 'h':
 			usage(0);
 		case 'a':
@@ -646,6 +649,37 @@ int main(int argc, char *argv[])
 	euid = geteuid();
 	if (uid < 0 || uid != euid)
 		printf("jitterdebugger is not running with root rights.");
+
+
+	if (opt_dir) {
+		err = mkdir(opt_dir, 0777);
+		if (err) {
+			if (errno != EEXIST) {
+				err_handler(errno,
+					"Creating directory '%s' failed\n",
+					opt_dir);
+			}
+			warn_handler("Directory '%s' already exist: overwriting contents", opt_dir);
+		}
+	}
+
+	if (opt_file) {
+		if (opt_dir)
+			asprintf(&fname, "%s/%s", opt_dir, opt_file);
+		else
+			fname = strdup(opt_file);
+
+		if (!fname)
+			err_abort("Could not create filename string");
+
+		rfd = fopen(fname, "w");
+		if (!rfd)
+			err_abort("Could not open file '%s'", fname);
+
+		free(fname);
+	}
+	if (!rfd)
+		rfd = stdout;
 
 	sa.sa_flags = 0;
 	sa.sa_handler = sig_handler;
@@ -701,9 +735,9 @@ int main(int argc, char *argv[])
 	if (err < 0)
 		err_handler(errno, "starting workload failed");
 
-	start_measuring(s, opt_net || opt_samples);
+	start_measuring(s, opt_net || opt_dir);
 
-	if (opt_net || opt_samples) {
+	if (opt_net || opt_dir) {
 		rec = malloc(sizeof(*rec));
 		if (!rec)
 			err_handler(ENOMEM, "malloc()");
@@ -717,7 +751,10 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 		}
-		rec->filename = opt_samples;
+		err = asprintf(&rec->filename, "%s/samples.raw", opt_dir);
+		if (err < 0)
+			err_abort("Could not create filename string");
+
 		rec->stats = s;
 		err = pthread_create(&iopid, NULL, store_samples, rec);
 		if (err)
@@ -744,6 +781,7 @@ int main(int argc, char *argv[])
 		if (err)
 			err_handler(err, "pthread_join()");
 
+		free(rec->filename);
 		free(rec);
 	}
 
@@ -754,14 +792,6 @@ int main(int argc, char *argv[])
 	}
 
 	printf("\n");
-
-	if (opt_file) {
-		rfd = fopen(opt_file, "w");
-		if (!rfd)
-			warn_handler("Could not open file '%s'", opt_file);
-	}
-	if (!rfd)
-		rfd = stdout;
 
 	dump_stats(rfd, s);
 
