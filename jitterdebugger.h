@@ -44,15 +44,17 @@ void _err_handler(int error, char *format, ...)
 void _warn_handler(char *format, ...)
 	__attribute__((format(printf, 1, 2)));
 
-#define err_handler(error, fmt, arg...) do {					\
-	_err_handler(error, "%s:%s(): " fmt, __FILE__, __func__, ## arg); \
+#define err_handler(error, fmt, arg...) do {			\
+	_err_handler(error, "%s:%s(): " fmt,			\
+			__FILE__, __func__, ## arg);		\
 } while (0)
-#define warn_handler(fmt, arg...) do {						\
-	_warn_handler("%s:%s(): " fmt "\n", __FILE__, __func__, ## arg); \
+#define warn_handler(fmt, arg...) do {				\
+	_warn_handler("%s:%s(): " fmt "\n",			\
+			__FILE__, __func__, ## arg);		\
 } while (0)
-#define err_abort(fmt, arg...) do {	\
-	fprintf(stderr, fmt, ## arg);	\
-	exit(1);			\
+#define err_abort(fmt, arg...) do {				\
+	fprintf(stderr, fmt "\n", ## arg);			\
+	exit(1);						\
 } while (0)
 
 long int parse_num(const char *str, int base, size_t *len);
