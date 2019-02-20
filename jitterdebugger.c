@@ -551,17 +551,17 @@ int main(int argc, char *argv[])
 	int long_idx;
 	long val;
 	struct record_data *rec = NULL;
-
-	CPU_ZERO(&affinity_set);
+	FILE *rfd = NULL;
 
 	/* Command line options */
-	unsigned int timeout = 0;
-	char *output = NULL;
-	char *command = NULL;
-	char *samples = NULL;
-	char *network = NULL;
-	FILE *stream = NULL;
-	int verbose = 0;
+	unsigned int opt_timeout = 0;
+	char *opt_file = NULL;
+	char *opt_cmd = NULL;
+	char *opt_net = NULL;
+	char *opt_samples = NULL;
+	int opt_verbose = 0;
+
+	CPU_ZERO(&affinity_set);
 
 	while (1) {
 		c = getopt_long(argc, argv, "f:c:N:p:vt:l:b:i:o:a:h", long_options,
@@ -578,13 +578,13 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'f':
-			output = optarg;
+			opt_file = optarg;
 			break;
 		case 'c':
-			command = optarg;
+			opt_cmd = optarg;
 			break;
 		case 'N':
-			network = optarg;
+			opt_net = optarg;
 			break;
 		case 'p':
 			val = parse_dec(optarg);
@@ -594,14 +594,14 @@ int main(int argc, char *argv[])
 			priority = val;
 			break;
 		case 'v':
-			verbose = 1;
+			opt_verbose = 1;
 			break;
 		case 't':
 			val = parse_timeout(optarg);
 			if (val < 0)
 				err_abort("Invalid value for timeout. "
 					"Valid postfixes are 'd', 'h', 'm', 's'\n");
-			timeout = val;
+			opt_timeout = val;
 			break;
 		case 'l':
 			val = parse_dec(optarg);
@@ -626,7 +626,7 @@ int main(int argc, char *argv[])
 			sleep_interval_us = val;
 			break;
 		case 'o':
-			samples = optarg;
+			opt_samples = optarg;
 			break;
 		case 'h':
 			usage(0);
@@ -660,8 +660,8 @@ int main(int argc, char *argv[])
 	if (sigaction(SIGALRM, &sa, NULL) < 0)
 		err_handler(errno, "sigaction()");
 
-	if (timeout > 0)
-		alarm(timeout);
+	if (opt_timeout > 0)
+		alarm(opt_timeout);
 
 	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
 		if (errno == ENOMEM || errno == EPERM)
@@ -686,7 +686,7 @@ int main(int argc, char *argv[])
 	} else
 		affinity = affinity_available;
 
-	if (verbose) {
+	if (opt_verbose) {
 		printf("affinity: ");
 		cpuset_fprint(stdout, &affinity);
 		printf("\n");
@@ -697,19 +697,19 @@ int main(int argc, char *argv[])
 	if (!s)
 		err_handler(errno, "calloc()");
 
-	err = start_workload(command);
+	err = start_workload(opt_cmd);
 	if (err < 0)
 		err_handler(errno, "starting workload failed");
 
-	start_measuring(s, network || samples);
+	start_measuring(s, opt_net || opt_samples);
 
-	if (network || samples) {
+	if (opt_net || opt_samples) {
 		rec = malloc(sizeof(*rec));
 		if (!rec)
 			err_handler(ENOMEM, "malloc()");
 
-		if (network) {
-			rec->server = strtok(network, " :");
+		if (opt_net) {
+			rec->server = strtok(opt_net, " :");
 			rec->port = strtok(NULL, " :");
 
 			if (!rec->server || !rec->port) {
@@ -717,14 +717,14 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 		}
-		rec->filename = samples;
+		rec->filename = opt_samples;
 		rec->stats = s;
 		err = pthread_create(&iopid, NULL, store_samples, rec);
 		if (err)
 			err_handler(err, "pthread_create()");
 	}
 
-	if (verbose) {
+	if (opt_verbose) {
 		err = pthread_create(&pid, NULL, display_stats, s);
 		if (err)
 			err_handler(err, "pthread_create()");
@@ -747,7 +747,7 @@ int main(int argc, char *argv[])
 		free(rec);
 	}
 
-	if (verbose) {
+	if (opt_verbose) {
 		err = pthread_join(pid, NULL);
 		if (err)
 			err_handler(err, "pthread_join()");
@@ -755,17 +755,17 @@ int main(int argc, char *argv[])
 
 	printf("\n");
 
-	if (output) {
-		stream = fopen(output, "w");
-		if (!stream)
-			warn_handler("Could not open file '%s'", output);
+	if (opt_file) {
+		rfd = fopen(opt_file, "w");
+		if (!rfd)
+			warn_handler("Could not open file '%s'", opt_file);
 	}
-	if (!stream)
-		stream = stdout;
+	if (!rfd)
+		rfd = stdout;
 
-	dump_stats(stream, s);
+	dump_stats(rfd, s);
 
-	if (verbose && break_val != UINT_MAX) {
+	if (opt_verbose && break_val != UINT_MAX) {
 		for (i = 0; i < num_threads; i++) {
 			if (s[i].max > break_val)
 				printf("Thread %lu on CPU %u hit %u us latency\n",
@@ -773,8 +773,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (stream != stdout)
-		fclose(stream);
+	if (rfd != stdout)
+		fclose(rfd);
 
 	for (i = 0; i < num_threads; i++)
 		free(s[i].hist);
