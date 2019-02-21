@@ -105,6 +105,18 @@ void store_system_info(const char *path, struct system_info *sysinfo)
 	cp("/proc/interrupts", path);
 	cp("/proc/sched_debug", path);
 
+	// cpus_online
+	if (asprintf(&fname, "%s/cpus_online", path) < 0) {
+		warn_handler("asprintf()\n");
+		return;
+	}
+	fd = fopen(fname, "w");
+	free(fname);
+	if (!fd)
+		return;
+	fprintf(fd, "%d\n", sysinfo->cpus_online);
+	fclose(fd);
+
 	// uname
 	if (asprintf(&fname, "%s/uname", path) < 0) {
 		warn_handler("asprintf()\n");
