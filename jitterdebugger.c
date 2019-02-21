@@ -153,54 +153,6 @@ static pid_t gettid(void)
 	return syscall(SYS_gettid);
 }
 
-static int sysfs_load_str(const char *path, char **buf)
-{
-	int fd, ret;
-	size_t len;
-
-	fd = TEMP_FAILURE_RETRY(open(path, O_RDONLY));
-	if (fd < 0)
-		return -errno;
-
-	len = sysconf(_SC_PAGESIZE);
-
-	*buf = malloc(len);
-	if (!*buf) {
-		ret = -ENOMEM;
-		goto out_fd;
-	}
-
-	ret = read(fd, *buf, len - 1);
-	if (ret < 0) {
-		ret = -errno;
-		goto out_buf;
-	}
-
-	buf[ret] = 0;
-out_buf:
-	if (ret < 0)
-		free(*buf);
-out_fd:
-	close(fd);
-	return ret;
-}
-
-static int cpus_online(cpu_set_t *set)
-{
-	int ret;
-	char *buf;
-
-	ret = sysfs_load_str("/sys/devices/system/cpu/online", &buf);
-	if (ret < 0)
-		return -errno;
-
-	CPU_ZERO(set);
-	ret = cpuset_parse(set, buf);
-	free(buf);
-
-	return ret;
-}
-
 static void dump_stats(FILE *f, struct stats *s)
 {
 	unsigned int i, j, comma;
