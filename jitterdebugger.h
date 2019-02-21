@@ -78,4 +78,16 @@ ssize_t cpuset_parse(cpu_set_t *set, const char *str);
 int start_workload(const char *cmd);
 void stop_workload(void);
 
+struct system_info {
+	char *sysname;
+	char *nodename;
+	char *release;
+	char *version;
+	char *machine;
+	int cpus_online;
+};
+struct system_info *collect_system_info(void);
+void store_system_info(const char *path, struct system_info *sysinfo);
+void free_system_info(struct system_info *sysinfo);
+
 #endif /* __JITTERDEBUGGER_H */

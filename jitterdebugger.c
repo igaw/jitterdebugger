@@ -153,12 +153,20 @@ static pid_t gettid(void)
 	return syscall(SYS_gettid);
 }
 
-static void dump_stats(FILE *f, struct stats *s)
+static void dump_stats(FILE *f, struct system_info *sysinfo, struct stats *s)
 {
 	unsigned int i, j, comma;
 
 	fprintf(f, "{\n");
-	fprintf(f, "  \"version\": 1,\n");
+	fprintf(f, "  \"version\": 2,\n");
+	fprintf(f, "  \"sysinfo\": {\n");
+	fprintf(f, "    \"sysname\": \"%s\",\n", sysinfo->sysname);
+	fprintf(f, "    \"nodename\": \"%s\",\n", sysinfo->nodename);
+	fprintf(f, "    \"release\": \"%s\",\n", sysinfo->release);
+	fprintf(f, "    \"version\": \"%s\",\n", sysinfo->version);
+	fprintf(f, "    \"machine\": \"%s\",\n", sysinfo->machine);
+	fprintf(f, "    \"cpus_online\": %d\n", sysinfo->cpus_online);
+	fprintf(f, "  },\n");
 	fprintf(f, "  \"cpu\": {\n");
 	for (i = 0; i < num_threads; i++) {
 		fprintf(f, "    \"%u\": {\n", i);
@@ -181,7 +189,6 @@ static void dump_stats(FILE *f, struct stats *s)
 			(double)s[i].total / (double)s[i].count);
 		fprintf(f, "    }%s\n", i == num_threads - 1 ? "" : ",");
 	}
-
 	fprintf(f, "  }\n");
 	fprintf(f, "}\n");
 }
@@ -506,6 +513,7 @@ int main(int argc, char *argv[])
 	char *fname;
 	struct record_data *rec = NULL;
 	FILE *rfd = NULL;
+	struct system_info *sysinfo;
 
 	/* Command line options */
 	unsigned int opt_timeout = 0;
@@ -603,6 +611,7 @@ int main(int argc, char *argv[])
 		printf("jitterdebugger is not running with root rights.");
 
 
+	sysinfo = collect_system_info();
 	if (opt_dir) {
 		err = mkdir(opt_dir, 0777);
 		if (err) {
@@ -613,6 +622,7 @@ int main(int argc, char *argv[])
 			}
 			warn_handler("Directory '%s' already exist: overwriting contents", opt_dir);
 		}
+		store_system_info(opt_dir, sysinfo);
 	}
 
 	if (opt_file) {
@@ -745,7 +755,8 @@ int main(int argc, char *argv[])
 
 	printf("\n");
 
-	dump_stats(rfd, s);
+	dump_stats(rfd, sysinfo, s);
+	free_system_info(sysinfo);
 
 	if (opt_verbose && break_val != UINT_MAX) {
 		for (i = 0; i < num_threads; i++) {
