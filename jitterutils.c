@@ -57,6 +57,12 @@ struct ringbuffer *ringbuffer_create(unsigned int size)
 	return rb;
 }
 
+void ringbuffer_free(struct ringbuffer *rb)
+{
+	free(rb->data);
+	free(rb);
+}
+
 int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val)
 {
 	uint32_t read, idx;

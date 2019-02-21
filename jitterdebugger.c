@@ -806,8 +806,11 @@ int main(int argc, char *argv[])
 	if (rfd != stdout)
 		fclose(rfd);
 
-	for (i = 0; i < num_threads; i++)
+	for (i = 0; i < num_threads; i++) {
 		free(s[i].hist);
+		if (s[i].rb)
+			ringbuffer_free(s[i].rb);
+	}
 	free(s);
 
 	if (tracemark_fd > 0)

@@ -36,6 +36,7 @@ struct latency_sample {
 struct ringbuffer;
 
 struct ringbuffer *ringbuffer_create(unsigned int size);
+void ringbuffer_free(struct ringbuffer *rb);
 int ringbuffer_read(struct ringbuffer *rb, struct timespec *ts, uint64_t *val);
 int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val);
 
