@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 
+import os
 import sys
 import json
 import argparse
+import subprocess
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 __version__ = '0.3'
@@ -35,8 +38,13 @@ def plot_histogram(filename):
     plt.setp(L.texts, family='monospace')
     plt.show()
 
-def load_hdf(filename):
-    df = pd.read_hdf(filename)
+def load_samples(filename):
+    dt = np.dtype([('CPUID', 'u4'),
+                   ('Seconds', 'u8'),
+                   ('Nanoseconds', 'u8'),
+                   ('Value', 'u8')])
+    data = np.fromfile(filename, dtype=dt)
+    df = pd.DataFrame(data)
     return df
 
 def plot_all_cpus(df):
@@ -71,9 +79,16 @@ def main():
 
     args = ap.parse_args(sys.argv[1:])
     if args.cmd == 'hist':
-        plot_histogram(args.HIST_FILE)
+        fname = args.HIST_FILE
+        if os.path.isdir(fname):
+            fname = fname + '/results.json'
+        plot_histogram(fname)
     elif args.cmd == 'samples':
-        df = load_hdf(args.SAMPLE_FILE)
+        fname = args.SAMPLE_FILE
+        if os.path.isdir(fname):
+            fname = fname + '/samples.raw'
+
+        df = load_samples(fname)
         plot_all_cpus(df)
 
 if __name__ == '__main__':
