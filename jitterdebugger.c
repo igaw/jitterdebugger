@@ -54,9 +54,9 @@ struct stats {
 
 struct record_data {
 	struct stats *stats;
-	char *filename;
 	char *server;
 	char *port;
+	FILE *fd;
 };
 
 static int jd_shutdown;
@@ -232,26 +232,19 @@ static void *display_stats(void *arg)
 static void store_file(struct record_data *rec)
 {
 	struct stats *s = rec->stats;
-	FILE *file;
 	struct latency_sample sample;
 	int i;
-
-	file = fopen(rec->filename, "w");
-	if (!file)
-		err_handler(errno, "fopen()");
 
 	while (!READ_ONCE(jd_shutdown)) {
 		for (i = 0; i < num_threads; i++) {
 			sample.cpuid = i;
 			while (!ringbuffer_read(s[i].rb, &sample.ts, &sample.val)) {
-				fwrite(&sample, sizeof(struct latency_sample), 1, file);
+				fwrite(&sample, sizeof(struct latency_sample), 1, rec->fd);
 			}
 		}
 
 		usleep(DEFAULT_INTERVAL);
 	}
-
-	fclose(file);
 }
 
 static void store_network(struct record_data *rec)
@@ -317,7 +310,7 @@ static void store_network(struct record_data *rec)
 static void *store_samples(void *arg)
 {
 	struct record_data *rec = arg;
-	if (rec->filename)
+	if (rec->fd)
 		store_file(rec);
 	else
 		store_network(rec);
@@ -390,7 +383,7 @@ static void *worker(void *arg)
 	return NULL;
 }
 
-static void start_measuring(struct stats *s, int record)
+static void start_measuring(struct stats *s, struct record_data *rec)
 {
 	struct sched_param sched;
 	pthread_attr_t attr;
@@ -420,7 +413,7 @@ static void start_measuring(struct stats *s, int record)
 		if (!s[i].hist)
 			err_handler(errno, "calloc()");
 
-		if (record) {
+		if (rec) {
 			s[i].rb = ringbuffer_create(1024 * 1024);
 			if (!s[i].rb)
 				err_handler(ENOMEM, "ringbuffer_create()");
@@ -482,9 +475,8 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -h, --help            Print this help\n");
 	printf("  -v, --verbose         Print live statistics\n");
 	printf("      --version         Print version of jitterdebugger\n");
-	printf("  -o, --output DIR      Store all samples and meta information into DIR\n");
+	printf("  -o, --output DIR      Store collected data into DIR\n");
 	printf("  -c, --command CMD	Execute CMD (workload) in background\n");
-	printf("  -N			host:port to connect to\n");
 	printf("\n");
 	printf("Sampling:\n");
 	printf("  -l, --loops VALUE     Max number of measurements\n");
@@ -493,6 +485,8 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
 	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
+	printf("  -n			Send samples to host:port\n");
+	printf("  -s			Store samples into --output DIR\n");
 	printf("\n");
 	printf("Threads: \n");
 	printf("  -a, --affinity CPUSET Core affinity specification\n");
@@ -524,12 +518,13 @@ int main(int argc, char *argv[])
 	char *opt_dir = NULL;
 	char *opt_cmd = NULL;
 	char *opt_net = NULL;
+	int opt_samples = 0;
 	int opt_verbose = 0;
 
 	CPU_ZERO(&affinity_set);
 
 	while (1) {
-		c = getopt_long(argc, argv, "c:N:p:vt:l:b:i:o:a:h", long_options,
+		c = getopt_long(argc, argv, "c:n:sp:vt:l:b:i:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -548,8 +543,11 @@ int main(int argc, char *argv[])
 		case 'c':
 			opt_cmd = optarg;
 			break;
-		case 'N':
+		case 'n':
 			opt_net = optarg;
+			break;
+		case 's':
+			opt_samples = 1;
 			break;
 		case 'p':
 			val = parse_dec(optarg);
@@ -609,7 +607,6 @@ int main(int argc, char *argv[])
 	if (uid < 0 || uid != euid)
 		printf("jitterdebugger is not running with root rights.");
 
-
 	sysinfo = collect_system_info();
 	if (opt_dir) {
 		err = mkdir(opt_dir, 0777);
@@ -622,6 +619,37 @@ int main(int argc, char *argv[])
 			warn_handler("Directory '%s' already exist: overwriting contents", opt_dir);
 		} else {
 			store_system_info(opt_dir, sysinfo);
+		}
+	}
+
+	if (opt_net || opt_samples) {
+		if (opt_net && opt_samples) {
+			fprintf(stdout, "Can't use both options -s or -n together\n");
+			exit(1);
+		}
+
+		rec = malloc(sizeof(*rec));
+		if (!rec)
+			err_handler(ENOMEM, "malloc()");
+
+		if (opt_net) {
+			rec->server = strtok(opt_net, " :");
+			rec->port = strtok(NULL, " :");
+
+			if (!rec->server || !rec->port) {
+				fprintf(stdout, "Invalid server name and/or port string\n");
+				exit(1);
+			}
+		}
+
+		if (opt_samples) {
+			if (!opt_dir) {
+				fprintf(stdout, "-o/--output is needed with -s option\n");
+				exit(1);
+			}
+			rec->fd = jd_fopen(opt_dir, "samples.raw", "w");
+			if (!rec->fd)
+				err_handler(errno, "Couldn't create samples.raw file");
 		}
 	}
 
@@ -679,26 +707,9 @@ int main(int argc, char *argv[])
 	if (err < 0)
 		err_handler(errno, "starting workload failed");
 
-	start_measuring(s, opt_net || opt_dir);
+	start_measuring(s, rec);
 
-	if (opt_net || opt_dir) {
-		rec = malloc(sizeof(*rec));
-		if (!rec)
-			err_handler(ENOMEM, "malloc()");
-
-		if (opt_net) {
-			rec->server = strtok(opt_net, " :");
-			rec->port = strtok(NULL, " :");
-
-			if (!rec->server || !rec->port) {
-				fprintf(stdout, "Invalid server name and/or port string\n");
-				exit(1);
-			}
-		}
-		err = asprintf(&rec->filename, "%s/samples.raw", opt_dir);
-		if (err < 0)
-			err_abort("Could not create filename string");
-
+	if (opt_net || opt_samples) {
 		rec->stats = s;
 		err = pthread_create(&iopid, NULL, store_samples, rec);
 		if (err)
@@ -725,7 +736,8 @@ int main(int argc, char *argv[])
 		if (err)
 			err_handler(err, "pthread_join()");
 
-		free(rec->filename);
+		if (rec->fd)
+			fclose(rec->fd);
 		free(rec);
 	}
 
