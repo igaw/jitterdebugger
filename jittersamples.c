@@ -156,14 +156,13 @@ static void output_hdf5(FILE *input, const char *ofile, int cpus_online)
 	H5Fclose(file);
 }
 
-static void store_samples(const char *file, const char *port)
+static void dump_samples(const char *port)
 {
 	struct addrinfo hints, *res, *tmp;
 	struct latency_sample sp[SAMPLES_PER_PACKET];
 	ssize_t len;
 	size_t wlen;
 	int err, sk;
-	FILE *fd;
 
 	bzero(&hints, sizeof(struct addrinfo));
 	hints.ai_flags = AI_PASSIVE;
@@ -190,22 +189,17 @@ static void store_samples(const char *file, const char *port)
 
 	freeaddrinfo(tmp);
 
-	fd = fopen(file, "w");
-	if (!fd)
-		err_handler(errno, "fopen()");
-
 	while (1) {
 		len = recvfrom(sk, sp, sizeof(sp), 0, NULL, NULL);
 		if (len != sizeof(sp)) {
 			warn_handler("UDP packet has wrong size\n");
 			continue;
 		}
-		wlen = fwrite(sp, sizeof(sp), 1, fd);
+		wlen = fwrite(sp, sizeof(sp), 1, stdout);
 		if (wlen < 0)
 			err_handler(errno, "fwrite()");
 	}
 
-	fclose(fd);
 	close(sk);
 }
 
@@ -213,7 +207,6 @@ static struct option long_options[] = {
 	{ "help",	no_argument,		0,	'h' },
 	{ "version",	no_argument,		0,	 0  },
 	{ "format",	required_argument,	0,	'f' },
-	{ "output",	required_argument,	0,	'o' },
 	{ "listen",	required_argument,	0,	'l' },
 	{ 0, },
 };
@@ -227,8 +220,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -h, --help		Print this help\n");
 	printf("      --version		Print version of jittersamples\n");
 	printf("  -f, --format FMT	Exporting samples in format [cvs, hdf5]\n");
-	printf("  -o, --output FILE	Write output into FILE\n");
-	printf("  -l, --listen PORT	Listen on PORT an write samples into FILE (default stdout)\n");
+	printf("  -l, --listen PORT	Listen on PORT, dump samples to stdout\n");
 
 	exit(status);
 }
@@ -236,14 +228,13 @@ static void __attribute__((noreturn)) usage(int status)
 int main(int argc, char *argv[])
 {
 	FILE *input, *output, *fd;
-	char *dir, *file, *fname;
+	char *dir;
 	int n, c, long_idx,cpus_online;
 	char *format = "cvs";
 	char *port = NULL;
 
-	file = "-";
 	while (1) {
-		c = getopt_long(argc, argv, "hf:o:l:", long_options, &long_idx);
+		c = getopt_long(argc, argv, "hf:l:", long_options, &long_idx);
 		if (c < 0)
 			break;
 
@@ -260,9 +251,6 @@ int main(int argc, char *argv[])
 		case 'f':
 			format = optarg;
 			break;
-		case 'o':
-			file = optarg;
-			break;
 		case 'l':
 			port = optarg;
 			break;
@@ -272,20 +260,18 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (optind == argc) {
-		fprintf(stderr, "Missing input file\n");
-		usage(1);
-	}
-
 	if (port) {
-		store_samples(file, port);
+		dump_samples(port);
 		exit(0);
 	}
 
+	if (optind == argc) {
+		fprintf(stderr, "Missing input DIR\n");
+		usage(1);
+	}
 	dir = argv[optind];
-	asprintf(&fname, "%s/cpus_online", dir);
-	fd = fopen(fname, "r");
-	free(fname);
+
+	fd = jd_fopen(dir, "cpus_online", "r");
 	if (!fd)
 		err_handler(errno, "Could not read %s/cpus_online\n", dir);
 	n = fscanf(fd, "%d\n", &cpus_online);
@@ -308,32 +294,32 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	asprintf(&fname, "%s/samples.raw", dir);
-	input = fopen(fname, "r");
-	free(fname);
+	input = jd_fopen(dir, "samples.raw", "r");
 	if (!input)
 		err_handler(errno, "Could not open '%s/samples.raw' for reading", dir);
 
-	if (!strcmp(file, "-"))
-		output = stdout;
-	else
-		output = fopen(file, "w");
-
 	if (!strcmp(format, "cvs")) {
+		output = jd_fopen(dir, "samples.csv", "w");
+		if (!output)
+			err_handler(errno, "Could not open '%s/samples.csv' for writing", dir);
 		output_cvs(input, output);
+
+		fclose(output);
 	} else if (!strcmp(format, "hdf5")) {
-		if (!strcmp(file, "-")) {
-			fprintf(stderr, "hdf5 format requires output file (--output)\n");
-			exit(1);
-		}
+		char *file;
+
+		if (asprintf(&file, "%s/samples.hdf5", dir) < 0)
+			err_handler(errno, "asprintf()");
+
 		output_hdf5(input, file, cpus_online);
+
+		free(file);
 	} else {
 		fprintf(stderr, "Unsupported file format \"%s\"\n", format);
 		exit(1);
 	}
 
 	fclose(input);
-	fclose(output);
 
 	return 0;
 }
