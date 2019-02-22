@@ -193,6 +193,22 @@ static void dump_stats(FILE *f, struct system_info *sysinfo, struct stats *s)
 	fprintf(f, "}\n");
 }
 
+static void __display_stats(struct stats *s)
+{
+	int i;
+
+	for (i = 0; i < num_threads; i++) {
+		printf("T:%2u (%5lu) A:%2u C:%10" PRIu64
+			" Min:%10u Avg:%8.2f Max:%10u "
+			VT100_ERASE_EOL "\n",
+			i, (long)s[i].tid, s[i].affinity,
+			s[i].count,
+			s[i].min,
+			(double) s[i].total / (double) s[i].count,
+			s[i].max);
+	}
+}
+
 static void *display_stats(void *arg)
 {
 	struct stats *s = arg;
@@ -204,16 +220,8 @@ static void *display_stats(void *arg)
 	while (!READ_ONCE(jd_shutdown)) {
 		printf(VT100_CURSOR_UP, num_threads);
 
-		for (i = 0; i < num_threads; i++) {
-			printf("T:%2u (%5lu) A:%2u C:%10" PRIu64
-				" Min:%10u Avg:%8.2f Max:%10u "
-				VT100_ERASE_EOL "\n",
-				i, (long)s[i].tid, s[i].affinity,
-				s[i].count,
-				s[i].min,
-				(double) s[i].total / (double) s[i].count,
-				s[i].max);
-		}
+		__display_stats(s);
+
 		fflush(stdout);
 		usleep(100 * 1000); /* 100 ms interval */
 	}
@@ -452,7 +460,6 @@ static struct option long_options[] = {
 	{ "help",	no_argument,		0,	'h' },
 	{ "verbose",	no_argument,		0,	'v' },
 	{ "version",	no_argument,		0,	 0  },
-	{ "file",	required_argument,	0,	'f' },
 	{ "command",	required_argument,	0,	'c' },
 	{ NULL,		required_argument,	0,	'N' },
 
@@ -475,9 +482,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("  -h, --help            Print this help\n");
 	printf("  -v, --verbose         Print live statistics\n");
 	printf("      --version         Print version of jitterdebugger\n");
-	printf("  -f, --file FILE       Store output into FILE\n");
 	printf("  -o, --output DIR      Store all samples and meta information into DIR\n");
-	printf("                        Overwrites -f option with 'results.json'\n");
 	printf("  -c, --command CMD	Execute CMD (workload) in background\n");
 	printf("  -N			host:port to connect to\n");
 	printf("\n");
@@ -510,14 +515,12 @@ int main(int argc, char *argv[])
 	cpu_set_t affinity_available, affinity_set;
 	int long_idx;
 	long val;
-	char *fname;
 	struct record_data *rec = NULL;
 	FILE *rfd = NULL;
 	struct system_info *sysinfo;
 
 	/* Command line options */
 	unsigned int opt_timeout = 0;
-	char *opt_file = NULL;
 	char *opt_dir = NULL;
 	char *opt_cmd = NULL;
 	char *opt_net = NULL;
@@ -526,7 +529,7 @@ int main(int argc, char *argv[])
 	CPU_ZERO(&affinity_set);
 
 	while (1) {
-		c = getopt_long(argc, argv, "f:c:N:p:vt:l:b:i:o:a:h", long_options,
+		c = getopt_long(argc, argv, "c:N:p:vt:l:b:i:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -539,11 +542,7 @@ int main(int argc, char *argv[])
 				exit(0);
 			}
 			break;
-		case 'f':
-			opt_file = optarg;
-			break;
 		case 'o':
-			opt_file = "results.json";
 			opt_dir = optarg;
 			break;
 		case 'c':
@@ -621,27 +620,10 @@ int main(int argc, char *argv[])
 					opt_dir);
 			}
 			warn_handler("Directory '%s' already exist: overwriting contents", opt_dir);
+		} else {
+			store_system_info(opt_dir, sysinfo);
 		}
-		store_system_info(opt_dir, sysinfo);
 	}
-
-	if (opt_file) {
-		if (opt_dir)
-			asprintf(&fname, "%s/%s", opt_dir, opt_file);
-		else
-			fname = strdup(opt_file);
-
-		if (!fname)
-			err_abort("Could not create filename string");
-
-		rfd = fopen(fname, "w");
-		if (!rfd)
-			err_abort("Could not open file '%s'", fname);
-
-		free(fname);
-	}
-	if (!rfd)
-		rfd = stdout;
 
 	sa.sa_flags = 0;
 	sa.sa_handler = sig_handler;
@@ -751,12 +733,23 @@ int main(int argc, char *argv[])
 		err = pthread_join(pid, NULL);
 		if (err)
 			err_handler(err, "pthread_join()");
+	} else {
+		printf("\n");
+		__display_stats(s);
 	}
 
 	printf("\n");
 
-	dump_stats(rfd, sysinfo, s);
-	free_system_info(sysinfo);
+	if (opt_dir) {
+		rfd = jd_fopen(opt_dir, "results.json", "w");
+		if (rfd) {
+			dump_stats(rfd, sysinfo, s);
+			fclose(rfd);
+		} else {
+			warn_handler("Couldn't create results.json");
+		}
+		free_system_info(sysinfo);
+	}
 
 	if (opt_verbose && break_val != UINT_MAX) {
 		for (i = 0; i < num_threads; i++) {
@@ -765,9 +758,6 @@ int main(int argc, char *argv[])
 					(long)s[i].tid, i, s[i].max);
 		}
 	}
-
-	if (rfd != stdout)
-		fclose(rfd);
 
 	for (i = 0; i < num_threads; i++) {
 		free(s[i].hist);
