@@ -90,4 +90,8 @@ struct system_info *collect_system_info(void);
 void store_system_info(const char *path, struct system_info *sysinfo);
 void free_system_info(struct system_info *sysinfo);
 
+char *jd_strdup(const char *src);
+FILE *jd_fopen(const char *path, const char *filename, const char *mode);
+void jd_cp(const char *src, const char *path);
+
 #endif /* __JITTERDEBUGGER_H */

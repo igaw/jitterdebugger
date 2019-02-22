@@ -15,6 +15,8 @@
 
 #include "jitterdebugger.h"
 
+#define BUFSIZE		4096
+
 struct ringbuffer_sample {
 	struct timespec ts;
 	uint64_t val;
@@ -350,4 +352,62 @@ out_buf:
 out_fd:
 	close(fd);
 	return ret;
+}
+
+char *jd_strdup(const char *src)
+{
+	char *dst;
+
+	dst = strdup(src);
+	if (!dst)
+		err_handler(errno, "strdup()");
+
+	return dst;
+}
+
+FILE *jd_fopen(const char *path, const char *filename, const char *mode)
+{
+	FILE *fd;
+	char *fn, *tmp;
+
+	tmp = jd_strdup(filename);
+	if (asprintf(&fn, "%s/%s", path, basename(tmp)) < 0)
+		err_handler(errno, "asprintf()");
+
+	fd = fopen(fn, mode);
+
+	free(tmp);
+	free(fn);
+
+	return fd;
+}
+
+void jd_cp(const char *src, const char *path)
+{
+	char buf[BUFSIZ];
+	FILE *fds, *fdd;
+	size_t n;
+
+	fds = fopen(src, "r");
+	if (!fds) {
+		warn_handler("Could not open '%s' for reading", src);
+		return;
+	}
+
+	fdd = jd_fopen(path, src, "w");
+	if (!fdd) {
+		fclose(fdd);
+		warn_handler("Could not copy '%s'", src);
+		return;
+	}
+
+	while ((n = fread(buf, sizeof(char), sizeof(buf), fds)) > 0) {
+		if (fwrite(buf, sizeof(char), n, fdd) != n) {
+			warn_handler("Could not copy '%s'", src);
+			goto out;
+		}
+	}
+out:
+	fclose(fdd);
+	fclose(fds);
 }

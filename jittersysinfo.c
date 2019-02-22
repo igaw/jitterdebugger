@@ -11,58 +11,8 @@
 
 #include "jitterdebugger.h"
 
-#define BUFSIZE				4096
 #define SYSLOG_ACTION_READ_ALL		   3
 #define SYSLOG_ACTION_SIZE_BUFFER	  10
-
-static inline char *jd_strdup(const char *src)
-{
-	char *dst;
-
-	dst = strdup(src);
-	if (!dst)
-		err_handler(errno, "strdup()");
-
-	return dst;
-}
-
-static void cp(const char *src, const char *path)
-{
-	char buf[BUFSIZ], *dst, *tmp;
-	FILE *fsrc, *fdst;
-	size_t n;
-
-	fsrc = fopen(src, "r");
-	if (!fsrc) {
-		warn_handler("Could not open '%s' for reading", src);
-		return;
-	}
-
-	tmp = jd_strdup(src);
-	if (asprintf(&dst, "%s/%s", path, basename(tmp)) < 0) {
-		free(tmp);
-		fclose(fsrc);
-		return;
-	}
-	free(tmp);
-	fdst = fopen(dst, "w");
-	free(dst);
-	if (!fdst) {
-		fclose(fsrc);
-		warn_handler("Could not open '%s' for wrtiing", dst);
-		return;
-	}
-
-	while ((n = fread(buf, sizeof(char), sizeof(buf), fsrc)) > 0) {
-		if (fwrite(buf, sizeof(char), n, fdst) != n) {
-			warn_handler("write failed\n");
-			goto out;
-		}
-	}
-out:
-	fclose(fdst);
-	fclose(fsrc);
-}
 
 struct system_info *collect_system_info(void)
 {
@@ -99,31 +49,21 @@ void store_system_info(const char *path, struct system_info *sysinfo)
 	FILE *fd;
 	int len;
 
-	cp("/proc/cmdline", path);
-	cp("/proc/config.gz", path);
-	cp("/proc/cpuinfo", path);
-	cp("/proc/interrupts", path);
-	cp("/proc/sched_debug", path);
+	jd_cp("/proc/cmdline", path);
+	jd_cp("/proc/config.gz", path);
+	jd_cp("/proc/cpuinfo", path);
+	jd_cp("/proc/interrupts", path);
+	jd_cp("/proc/sched_debug", path);
 
 	// cpus_online
-	if (asprintf(&fname, "%s/cpus_online", path) < 0) {
-		warn_handler("asprintf()\n");
-		return;
-	}
-	fd = fopen(fname, "w");
-	free(fname);
+	fd = jd_fopen(path, "cpus_online", "w");
 	if (!fd)
 		return;
 	fprintf(fd, "%d\n", sysinfo->cpus_online);
 	fclose(fd);
 
 	// uname
-	if (asprintf(&fname, "%s/uname", path) < 0) {
-		warn_handler("asprintf()\n");
-		return;
-	}
-	fd = fopen(fname, "w");
-	free(fname);
+	fd = jd_fopen(path, "uname", "w");
 	if (!fd)
 		return;
 	fprintf(fd, "%s %s %s %s %s\n",
@@ -140,30 +80,19 @@ void store_system_info(const char *path, struct system_info *sysinfo)
 	if (!buf)
 		err_handler(errno, "malloc()");
 
-	if (klogctl(SYSLOG_ACTION_READ_ALL, buf, len) < 0) {
-		warn_handler("reading kernel log buffer failed\n");
+	if (klogctl(SYSLOG_ACTION_READ_ALL, buf, len) < 0)
 		return;
-	}
 
-	if (asprintf(&fname, "%s/dmesg", path) < 0) {
-		free(buf);
-		warn_handler("asprintf()\n");
-		return;
-	}
-
-	fd = fopen(fname, "w");
-	free(fname);
+	fd = jd_fopen(path, "dmesg", "w");
 	if (!fd) {
 		free(buf);
-		warn_handler("Could not open %s/dmesg file to write", path);
 		return;
 	}
 
 	if (fwrite(buf, sizeof(char), len, fd) != len)
-		warn_handler("write failed\n");
+		warn_handler("writing dmesg failed\n");
 
 	fclose(fd);
-
 	free(buf);
 }
 
