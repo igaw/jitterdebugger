@@ -457,6 +457,7 @@ static struct option long_options[] = {
 	{ NULL,		required_argument,	0,	'N' },
 
 	{ "loops",	required_argument,	0,	'l' },
+	{ "runtime",	required_argument,	0,	'r' },
 	{ "break",	required_argument,	0,	'b' },
 	{ "interval",	required_argument,	0,	'i' },
 	{ "output",	required_argument,	0,	'o' },
@@ -480,7 +481,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("\n");
 	printf("Sampling:\n");
 	printf("  -l, --loops VALUE     Max number of measurements\n");
-	printf("  -t, --timeout TIME    Run test for TIME in seconds.\n");
+	printf("  -r, --runtime TIME    Run test for TIME in seconds.\n");
 	printf("			Allowed postfixes 'd', 'h', 'm', 's'\n");
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
@@ -514,7 +515,7 @@ int main(int argc, char *argv[])
 	struct system_info *sysinfo;
 
 	/* Command line options */
-	unsigned int opt_timeout = 0;
+	unsigned int opt_runtime = 0;
 	char *opt_dir = NULL;
 	char *opt_cmd = NULL;
 	char *opt_net = NULL;
@@ -524,7 +525,7 @@ int main(int argc, char *argv[])
 	CPU_ZERO(&affinity_set);
 
 	while (1) {
-		c = getopt_long(argc, argv, "c:n:sp:vt:l:b:i:o:a:h", long_options,
+		c = getopt_long(argc, argv, "c:n:sp:vr:l:b:i:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -559,12 +560,12 @@ int main(int argc, char *argv[])
 		case 'v':
 			opt_verbose = 1;
 			break;
-		case 't':
-			val = parse_timeout(optarg);
+		case 'r':
+			val = parse_time(optarg);
 			if (val < 0)
-				err_abort("Invalid value for timeout. "
+				err_abort("Invalid value for runtime. "
 					"Valid postfixes are 'd', 'h', 'm', 's'\n");
-			opt_timeout = val;
+			opt_runtime = val;
 			break;
 		case 'l':
 			val = parse_dec(optarg);
@@ -666,8 +667,8 @@ int main(int argc, char *argv[])
 	if (sigaction(SIGALRM, &sa, NULL) < 0)
 		err_handler(errno, "sigaction()");
 
-	if (opt_timeout > 0)
-		alarm(opt_timeout);
+	if (opt_runtime > 0)
+		alarm(opt_runtime);
 
 	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
 		if (errno == ENOMEM || errno == EPERM)

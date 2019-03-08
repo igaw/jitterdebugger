@@ -149,7 +149,7 @@ long int parse_num(const char *str, int base, size_t *len)
 	return ret;
 }
 
-long int parse_timeout(const char *str)
+long int parse_time(const char *str)
 {
 	long int time;
 	size_t len;

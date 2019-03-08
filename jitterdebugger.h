@@ -59,7 +59,7 @@ void _warn_handler(char *format, ...)
 } while (0)
 
 long int parse_num(const char *str, int base, size_t *len);
-long int parse_timeout(const char *str);
+long int parse_time(const char *str);
 
 static inline long int parse_dec(const char *str)
 {
