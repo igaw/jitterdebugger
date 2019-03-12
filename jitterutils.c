@@ -217,7 +217,7 @@ unsigned long cpuset_to_bits(cpu_set_t *set)
 	unsigned long bits = 0;
 	unsigned int i, t, bit;
 
-	for (i = 0, t = 0; t < CPU_COUNT(set); i++) {
+	for (i = 0, t = 0; t < (unsigned) CPU_COUNT(set); i++) {
 		bit = CPU_ISSET(i, set);
 		bits |= bit << i;
 		t += bit;
@@ -238,7 +238,7 @@ void cpuset_fprint(FILE *f, cpu_set_t *set)
 	unsigned long bit = 0, range = 0;
 	unsigned long i, t, comma = 0;
 
-	for (i = 0, t = 0; t < CPU_COUNT(set); t += bit, i++) {
+	for (i = 0, t = 0; t < (unsigned) CPU_COUNT(set); t += bit, i++) {
 		bit = CPU_ISSET(i, set);
 		if (!range && bit) {
 			if (comma)

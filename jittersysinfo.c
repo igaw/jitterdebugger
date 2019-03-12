@@ -47,7 +47,7 @@ void store_system_info(const char *path, struct system_info *sysinfo)
 {
 	char *buf;
 	FILE *fd;
-	int len;
+	unsigned int len;
 
 	jd_cp("/proc/cmdline", path);
 	jd_cp("/proc/config.gz", path);

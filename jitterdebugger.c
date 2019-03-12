@@ -195,7 +195,7 @@ static void dump_stats(FILE *f, struct system_info *sysinfo, struct stats *s)
 
 static void __display_stats(struct stats *s)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < num_threads; i++) {
 		printf("T:%2u (%5lu) A:%2u C:%10" PRIu64
@@ -233,7 +233,7 @@ static void store_file(struct record_data *rec)
 {
 	struct stats *s = rec->stats;
 	struct latency_sample sample;
-	int i;
+	unsigned int i;
 
 	while (!READ_ONCE(jd_shutdown)) {
 		for (i = 0; i < num_threads; i++) {
@@ -253,7 +253,8 @@ static void store_network(struct record_data *rec)
 	struct addrinfo hints, *res, *tmp;
 	struct sockaddr *sa;
 	socklen_t salen;
-	int len, err, sk, i, c;
+	int err, sk, len;
+	unsigned int i, c;
 	struct stats *s = rec->stats;
 
 	bzero(&hints, sizeof(struct addrinfo));
@@ -505,7 +506,6 @@ int main(int argc, char *argv[])
 	unsigned int i;
 	int c, fd, err;
 	struct stats *s;
-	uid_t uid, euid;
 	pthread_t pid, iopid;
 	cpu_set_t affinity_available, affinity_set;
 	int long_idx;
@@ -603,9 +603,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	uid = getuid();
-	euid = geteuid();
-	if (uid < 0 || uid != euid)
+	if (geteuid() != 0)
 		printf("jitterdebugger is not running with root rights.");
 
 	sysinfo = collect_system_info();

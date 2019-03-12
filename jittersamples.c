@@ -48,7 +48,7 @@ struct cpu_data {
 	struct latency_sample *data;
 };
 
-static void output_hdf5(FILE *input, const char *ofile, int cpus_online)
+static void output_hdf5(FILE *input, const char *ofile, unsigned int cpus_online)
 {
 	struct cpu_data *cpudata;
 	struct latency_sample *data, *s, *d;
@@ -57,7 +57,7 @@ static void output_hdf5(FILE *input, const char *ofile, int cpus_online)
 	uint64_t nrs, bs;
 	size_t nr;
 	off_t sz;
-	int i, cnt;
+	unsigned int i, cnt;
 	char *sid;
 
 	if (fseeko(input, 0L, SEEK_END) < 0)
@@ -126,7 +126,7 @@ static void output_hdf5(FILE *input, const char *ofile, int cpus_online)
 
 		for (i = 0; i < nr; i++) {
 			s = &data[i];
-			if (s->cpuid < 0 || s->cpuid >= cpus_online) {
+			if (s->cpuid >= cpus_online) {
 				fprintf(stderr, "invalid sample found (cpuid %d)\n",
 					s->cpuid);
 				continue;
@@ -196,7 +196,7 @@ static void dump_samples(const char *port)
 			continue;
 		}
 		wlen = fwrite(sp, sizeof(sp), 1, stdout);
-		if (wlen < 0)
+		if (wlen != sizeof(sp))
 			err_handler(errno, "fwrite()");
 	}
 
