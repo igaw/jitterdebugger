@@ -89,7 +89,7 @@ void store_system_info(const char *path, struct system_info *sysinfo)
 		return;
 	}
 
-	if (fwrite(buf, sizeof(char), len, fd) != len)
+	if (fwrite(buf, sizeof(char), len, fd) != (size_t) len)
 		warn_handler("writing dmesg failed\n");
 
 	fclose(fd);
