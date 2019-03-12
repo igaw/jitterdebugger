@@ -7,7 +7,7 @@ TARGETS=jitterdebugger jittersamples
 
 all: $(TARGETS)
 
-jitterdebugger: jitterutils.o jitterwork.o jittersysinfo.c jitterdebugger.o
+jitterdebugger: jitterutils.o jitterwork.o jittersysinfo.o jitterdebugger.o
 
 jittersamples: export HDF5_CC=${CC}
 jittersamples: jitterutils.c jittersamples.c
