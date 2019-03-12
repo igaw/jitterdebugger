@@ -319,6 +319,7 @@ ssize_t cpuset_parse(cpu_set_t *set, const char *str)
 
 int sysfs_load_str(const char *path, char **buf)
 {
+	char *tmp_buf;
 	int fd, ret;
 	size_t len;
 
@@ -327,23 +328,22 @@ int sysfs_load_str(const char *path, char **buf)
 		return -errno;
 
 	len = sysconf(_SC_PAGESIZE);
-
-	*buf = malloc(len);
-	if (!*buf) {
+	tmp_buf = malloc(len);
+	if (!tmp_buf) {
 		ret = -ENOMEM;
 		goto out_fd;
 	}
 
-	ret = read(fd, *buf, len - 1);
+	ret = read(fd, tmp_buf, len - 1);
 	if (ret < 0) {
 		ret = -errno;
-		goto out_buf;
+		free(tmp_buf);
+		goto out_fd;
 	}
 
-	buf[ret] = 0;
-out_buf:
-	if (ret < 0)
-		free(*buf);
+	tmp_buf[ret] = 0; /* null termination */
+	*buf = tmp_buf;
+
 out_fd:
 	close(fd);
 	return ret;
