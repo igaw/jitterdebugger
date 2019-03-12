@@ -45,7 +45,7 @@ struct system_info *collect_system_info(void)
 
 void store_system_info(const char *path, struct system_info *sysinfo)
 {
-	char *fname, *buf;
+	char *buf;
 	FILE *fd;
 	int len;
 
