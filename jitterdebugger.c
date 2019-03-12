@@ -505,7 +505,6 @@ int main(int argc, char *argv[])
 	unsigned int i;
 	int c, fd, err;
 	struct stats *s;
-	uid_t uid, euid;
 	pthread_t pid, iopid;
 	cpu_set_t affinity_available, affinity_set;
 	int long_idx;
@@ -603,9 +602,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	uid = getuid();
-	euid = geteuid();
-	if (uid < 0 || uid != euid)
+	/* Check effective UID only (the one we do operations with).
+	   The compare below is sufficient since uid_t is unsigned. */
+	if (0 < geteuid())
 		printf("jitterdebugger is not running with root rights.");
 
 	sysinfo = collect_system_info();
