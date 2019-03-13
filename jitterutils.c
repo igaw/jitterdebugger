@@ -194,7 +194,7 @@ int cpus_online(cpu_set_t *set)
 
 	ret = sysfs_load_str("/sys/devices/system/cpu/online", &buf);
 	if (ret < 0)
-		return -errno;
+		return ret;
 
 	CPU_ZERO(set);
 	ret = cpuset_parse(set, buf);
