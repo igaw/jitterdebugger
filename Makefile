@@ -1,7 +1,14 @@
 # SPDX-License-Identifier: MIT
 
-CFLAGS+=-Wall -Wstrict-aliasing=1 -Wno-unused-result -pthread -O2
-LDFLAGS+=-pthread
+CFLAGS += -Wall -Wstrict-aliasing=1 -Wno-unused-result -pthread
+LDFLAGS += -pthread
+
+ifdef DEBUG
+	CFLAGS += -O0 -g
+	LDFLAGS += -g
+else
+	CFLAGS += -O2
+endif
 
 TARGETS=jitterdebugger jittersamples
 
