@@ -151,44 +151,39 @@ long int parse_num(const char *str, int base, size_t *len)
 
 long int parse_time(const char *str)
 {
-	long int time;
-	size_t len;
-	int factor = 1;
-	char c, *buf;
+	long int t;
+	char *end;
 
-	len = strlen(str);
-	if (len < 1)
+	t = strtol(str, &end, 10);
+
+	if (!(strlen(end) == 0 || strlen(end) == 1))
 		return -EINVAL;
 
-	c = tolower(str[len-1]);
-	switch (c) {
-	case 'd':
-		factor = 24;
-	case 'h':
-		factor *= 60;
-	case 'm':
-		factor *= 60;
-	case 's':
-		break;
-	default:
-		if (isalpha(c))
+	if (end) {
+		switch (*end) {
+		case 's':
+		case 'S':
+			break;
+		case 'm':
+		case 'M':
+			t *= 60;
+			break;
+
+		case 'h':
+		case 'H':
+			t *= 60 * 60;
+			break;
+
+		case 'd':
+		case 'D':
+			t *= 24 * 60 * 60;
+			break;
+		default:
 			return -EINVAL;
-		break;
+		}
 	}
 
-	buf = strdup(str);
-	if (!buf)
-		return -ENOMEM;
-
-	if (factor > 1)
-		buf[len - 1] = '\0';
-
-	time = parse_num(buf, 10, &len);
-	free(buf);
-
-	if (time < 0)
-		return time;
-	return time * factor;
+	return t;
 }
 
 /* cpu_set_t helpers */
