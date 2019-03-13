@@ -457,7 +457,7 @@ static struct option long_options[] = {
 	{ NULL,		required_argument,	0,	'N' },
 
 	{ "loops",	required_argument,	0,	'l' },
-	{ "runtime",	required_argument,	0,	'r' },
+	{ "duration",	required_argument,	0,	'D' },
 	{ "break",	required_argument,	0,	'b' },
 	{ "interval",	required_argument,	0,	'i' },
 	{ "output",	required_argument,	0,	'o' },
@@ -481,8 +481,8 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("\n");
 	printf("Sampling:\n");
 	printf("  -l, --loops VALUE     Max number of measurements\n");
-	printf("  -r, --runtime TIME    Run test for TIME in seconds.\n");
-	printf("			Allowed postfixes 'd', 'h', 'm', 's'\n");
+	printf("  -D, --duration TIME   Specify a length for the test run.\n");
+	printf("                        Append 'm', 'h', or 'd' to specify minutes, hours or days.\n");
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
 	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
@@ -515,7 +515,7 @@ int main(int argc, char *argv[])
 	struct system_info *sysinfo;
 
 	/* Command line options */
-	unsigned int opt_runtime = 0;
+	unsigned int opt_duration = 0;
 	char *opt_dir = NULL;
 	char *opt_cmd = NULL;
 	char *opt_net = NULL;
@@ -525,7 +525,7 @@ int main(int argc, char *argv[])
 	CPU_ZERO(&affinity_set);
 
 	while (1) {
-		c = getopt_long(argc, argv, "c:n:sp:vr:l:b:i:o:a:h", long_options,
+		c = getopt_long(argc, argv, "c:n:sp:vD:l:b:i:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -560,12 +560,12 @@ int main(int argc, char *argv[])
 		case 'v':
 			opt_verbose = 1;
 			break;
-		case 'r':
+		case 'D':
 			val = parse_time(optarg);
 			if (val < 0)
-				err_abort("Invalid value for runtime. "
+				err_abort("Invalid value for duration. "
 					"Valid postfixes are 'd', 'h', 'm', 's'\n");
-			opt_runtime = val;
+			opt_duration = val;
 			break;
 		case 'l':
 			val = parse_dec(optarg);
@@ -667,8 +667,8 @@ int main(int argc, char *argv[])
 	if (sigaction(SIGALRM, &sa, NULL) < 0)
 		err_handler(errno, "sigaction()");
 
-	if (opt_runtime > 0)
-		alarm(opt_runtime);
+	if (opt_duration > 0)
+		alarm(opt_duration);
 
 	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
 		if (errno == ENOMEM || errno == EPERM)
