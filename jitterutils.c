@@ -340,7 +340,7 @@ int sysfs_load_str(const char *path, char **buf)
 		goto out_buf;
 	}
 
-	buf[ret] = 0;
+	(*buf)[ret] = 0;
 out_buf:
 	if (ret < 0)
 		free(*buf);
