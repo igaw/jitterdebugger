@@ -9,29 +9,26 @@ matrix:
     - os: linux
       before_install:
         - docker pull debian:latest
-        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/igaw/jitterebugger -td debian:latest /bin/bash
+        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/travis -w /travis -td debian:latest /bin/bash
       install:
         - docker exec -ti travis-ci bash -c "apt-get update"
         - docker exec -ti travis-ci bash -c "apt-get install -y build-essential git libhdf5-dev"
     - os: linux
       before_install:
         - docker pull debian:testing
-        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/igaw/jitterebugger -td debian:testing /bin/bash
+        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/travis -w /travis -td debian:testing /bin/bash
       install:
         - docker exec -ti travis-ci bash -c "apt-get update"
         - docker exec -ti travis-ci bash -c "apt-get install -y build-essential git libhdf5-dev"
     - os: linux
       before_install:
         - docker pull fedora:latest
-        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/igaw/jitterebugger -td fedora:latest /bin/bash
+        - docker run --name travis-ci -v $TRAVIS_BUILD_DIR:/travis -w /travis -td fedora:latest /bin/bash
       install:
         - docker exec -ti travis-ci bash -c "dnf -y update"
         - docker exec -ti travis-ci bash -c "dnf -y install @development-tools git hdf5-devel redhat-rpm-config"
 
-before_script:
-  - docker exec -ti travis-ci bash -c "cd /igaw && git clone https://github.com/igaw/jitterdebugger"
-  - docker exec -ti travis-ci bash -c "cd /igaw/jitterdebugger && git checkout -qf $TRAVIS_COMMIT"
 script:
-  - docker exec -ti travis-ci bash -c "cd /igaw/jitterdebugger && CC=${CC} CXX=${CXX} make"
+  - docker exec -ti travis-ci bash -c "CC=$CC CXX=$CXX make"
 after_script:
   - docker stop travis-ci
