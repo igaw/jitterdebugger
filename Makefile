@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 
-CFLAGS += -Wall -Wstrict-aliasing=1 -Wno-unused-result -pthread
+CFLAGS += -pthread -Wall -Wstrict-aliasing=1 -Wno-unused-result \
+	  -Wsign-compare -Wtype-limits -Wmissing-prototypes \
+	  -Wstrict-prototypes
 LDFLAGS += -pthread
 
 ifdef DEBUG
