@@ -55,13 +55,13 @@ def plot_all_cpus(df):
     axes = fig.subplots(len(ids))
     for ax, data in zip(
         iter(axes),
-        (df[df["CPUID"] == id] for id in ids),
+        (df[df["CPUID"] == id].copy() for id in ids),
     ):
         data["Time"] = data["Seconds"] + data["Nanoseconds"] * 10**-9
         ax.plot("Time", "Value", data=data)
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Latency [us]")
-        ax.set_ylim(ymin=0, ymax=max_jitter)
+        ax.set_ylim(bottom=0, top=max_jitter)
     plt.show()
 
 
