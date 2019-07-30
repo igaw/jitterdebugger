@@ -27,7 +27,7 @@
        __x < __y ? __x : __y;                  \
 })
 
-static void output_cvs(FILE *input, FILE *output)
+static void output_csv(FILE *input, FILE *output)
 {
 	struct latency_sample sample;
 
@@ -219,7 +219,7 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("Usage:\n");
 	printf("  -h, --help		Print this help\n");
 	printf("      --version		Print version of jittersamples\n");
-	printf("  -f, --format FMT	Exporting samples in format [cvs, hdf5]\n");
+	printf("  -f, --format FMT	Exporting samples in format [csv, hdf5]\n");
 	printf("  -l, --listen PORT	Listen on PORT, dump samples to stdout\n");
 
 	exit(status);
@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
 	FILE *input, *output, *fd;
 	char *dir;
 	int n, c, long_idx,cpus_online;
-	char *format = "cvs";
+	char *format = "csv";
 	char *port = NULL;
 
 	while (1) {
@@ -298,11 +298,11 @@ int main(int argc, char *argv[])
 	if (!input)
 		err_handler(errno, "Could not open '%s/samples.raw' for reading", dir);
 
-	if (!strcmp(format, "cvs")) {
+	if (!strcmp(format, "csv")) {
 		output = jd_fopen(dir, "samples.csv", "w");
 		if (!output)
 			err_handler(errno, "Could not open '%s/samples.csv' for writing", dir);
-		output_cvs(input, output);
+		output_csv(input, output);
 
 		fclose(output);
 	} else if (!strcmp(format, "hdf5")) {
