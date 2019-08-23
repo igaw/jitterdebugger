@@ -15,8 +15,10 @@
 #include <netdb.h>
 #include <unistd.h>
 
+#ifdef CONFIG_HDF5
 #include <hdf5.h>
 #include <H5PTpublic.h>
+#endif
 
 #include "jitterdebugger.h"
 
@@ -43,11 +45,14 @@ static void output_csv(FILE *input, FILE *output)
 #define BLOCK_SIZE 10000
 
 struct cpu_data {
+#ifdef CONFIG_HDF5
 	hid_t set;
+#endif
 	uint64_t count;
 	struct latency_sample *data;
 };
 
+#ifdef CONFIG_HDF5
 static void output_hdf5(FILE *input, const char *ofile, unsigned int cpus_online)
 {
 	struct cpu_data *cpudata;
@@ -155,6 +160,12 @@ static void output_hdf5(FILE *input, const char *ofile, unsigned int cpus_online
 	H5Tclose(type);
 	H5Fclose(file);
 }
+#else
+static void output_hdf5(FILE *input, const char *ofile, unsigned int cpus_online)
+{
+	printf("HDF5 output is not supported by this jittersamples binary.\n");
+}
+#endif /* CONFIG_HDF5 */
 
 static void dump_samples(const char *port)
 {

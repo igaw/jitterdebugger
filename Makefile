@@ -12,6 +12,13 @@ else
 	CFLAGS += -O2
 endif
 
+# Determine if HDF5 support will be built into jittersamples
+JSCC=${CC}
+ifneq ("$(wildcard /usr/include/hdf5.h)", "")
+	CFLAGS += -DCONFIG_HDF5
+	JSCC = h5cc -shlib
+endif
+
 TARGETS=jitterdebugger jittersamples
 
 all: $(TARGETS)
@@ -20,9 +27,9 @@ jitterdebugger: jitterutils.o jitterwork.o jittersysinfo.o jitterdebugger.o
 
 jittersamples: export HDF5_CC=${CC}
 jittersamples: jitterutils.c jittersamples.c
-	h5cc ${CFLAGS} -c jitterutils.c
-	h5cc ${CFLAGS} -c jittersamples.c
-	h5cc -shlib jitterutils.o jittersamples.o -o jittersamples
+	${JSCC} ${CFLAGS} -c jitterutils.c
+	${JSCC} ${CFLAGS} -c jittersamples.c
+	${JSCC} jitterutils.o jittersamples.o -o jittersamples
 
 PHONY: .clean
 clean:
