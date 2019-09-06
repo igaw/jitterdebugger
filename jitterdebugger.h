@@ -7,6 +7,7 @@
 #include <sched.h>
 #include <time.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define JD_VERSION "0.3"
 
@@ -86,6 +87,7 @@ struct system_info {
 	char *machine;
 	int cpus_online;
 };
+
 struct system_info *collect_system_info(void);
 void store_system_info(const char *path, struct system_info *sysinfo);
 void free_system_info(struct system_info *sysinfo);
@@ -93,5 +95,45 @@ void free_system_info(struct system_info *sysinfo);
 char *jd_strdup(const char *src);
 FILE *jd_fopen(const char *path, const char *filename, const char *mode);
 void jd_cp(const char *src, const char *path);
+
+struct jd_samples_info {
+	const char *dir;
+	unsigned int cpus_online;
+};
+
+struct jd_samples_ops {
+	const char *name;
+	const char *format;
+	int (*output)(struct jd_samples_info *info, FILE *input);
+};
+
+int jd_samples_register(struct jd_samples_ops *ops);
+void jd_samples_unregister(struct jd_samples_ops *ops);
+
+struct jd_plugin_desc {
+	const char *name;
+	int (*init)(void);
+	void (*cleanup)(void);
+};
+
+#define JD_PLUGIN_ID(x) jd_plugin_desc __jd_builtin_ ## x
+#define JD_PLUGIN_DEFINE_1(name, init, cleanup)		\
+	struct JD_PLUGIN_ID(name) = {			\
+		#name, init, cleanup			\
+	};
+#define JD_PLUGIN_DEFINE(init, cleanup)			\
+	JD_PLUGIN_DEFINE_1(_FILENAME, init, cleanup)
+
+void __jd_plugin_init(void);
+void __jd_plugin_cleanup(void);
+
+// XXX replace single list with some library implementation
+struct jd_slist {
+	void *data;
+	struct jd_slist *next;
+};
+
+void jd_slist_append(struct jd_slist *jd_slist, void *data);
+void jd_slist_remove(struct jd_slist *jd_slist, void *data);
 
 #endif /* __JITTERDEBUGGER_H */

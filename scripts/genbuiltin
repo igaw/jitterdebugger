@@ -1,0 +1,21 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+
+echo "#include \"jitterdebugger.h\""
+echo
+
+for i in $*
+do
+	echo "extern struct jd_plugin_desc __jd_builtin_$i;"
+done
+
+echo
+echo "struct jd_plugin_desc *__jd_builtin[] = {"
+
+for i in $*
+do
+	echo "  &__jd_builtin_$i,"
+done
+
+echo "  NULL"
+echo "};"

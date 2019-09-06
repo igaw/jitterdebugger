@@ -15,145 +15,35 @@
 #include <netdb.h>
 #include <unistd.h>
 
-#include <hdf5.h>
-#include <H5PTpublic.h>
-
 #include "jitterdebugger.h"
 
-#define min(x,y)                               \
-({                                             \
-       typeof(x) __x = (x);		       \
-       typeof(x) __y = (y);		       \
-       __x < __y ? __x : __y;                  \
-})
-
-static void output_csv(FILE *input, FILE *output)
+static void read_online_cpus(struct jd_samples_info *info)
 {
-	struct latency_sample sample;
+	FILE *fd;
+	int n;
 
-	while(fread(&sample, sizeof(struct latency_sample), 1, input)) {
-		fprintf(output, "%d;%lld.%.9ld;%" PRIu64 "\n",
-			sample.cpuid,
-			(long long)sample.ts.tv_sec,
-			sample.ts.tv_nsec,
-			sample.val);
-	}
-}
-
-#define BLOCK_SIZE 10000
-
-struct cpu_data {
-	hid_t set;
-	uint64_t count;
-	struct latency_sample *data;
-};
-
-static void output_hdf5(FILE *input, const char *ofile, unsigned int cpus_online)
-{
-	struct cpu_data *cpudata;
-	struct latency_sample *data, *s, *d;
-	hid_t file, type;
-	herr_t err;
-	uint64_t nrs, bs;
-	size_t nr;
-	off_t sz;
-	unsigned int i, cnt;
-	char *sid;
-
-	if (fseeko(input, 0L, SEEK_END) < 0)
-		err_handler(errno, "fseek()");
-	sz = ftello(input);
-	if (fseeko(input, 0L, SEEK_SET) < 0)
-		err_handler(errno, "fseek()");
-
-	nrs = sz / sizeof(struct latency_sample);
-	bs = min(nrs, BLOCK_SIZE);
-
-	data = malloc(sizeof(struct latency_sample) * bs);
-	if (!data)
-		err_handler(ENOMEM, "malloc()");
-
-	file = H5Fcreate(ofile, H5F_ACC_TRUNC,
-			H5P_DEFAULT, H5P_DEFAULT);
-	if (file == H5I_INVALID_HID)
-		err_handler(EIO, "failed to open file %s\n", ofile);
-
-	type = H5Tcreate(H5T_COMPOUND, sizeof(struct latency_sample));
-	if (type == H5I_INVALID_HID)
-		err_handler(EIO, "failed to create compound HDF5 type");
-
-	err = H5Tinsert(type, "CPUID", 0, H5T_NATIVE_UINT32);
-	if (err < 0)
-		err_handler(EIO,
-			"failed to add type info to HDF5 compound type");
-	err = H5Tinsert(type, "Seconds", 4, H5T_NATIVE_UINT64);
-	if (err < 0)
-		err_handler(EIO,
-			"failed to add type info to HDF5 compound type");
-	err = H5Tinsert(type, "Nanoseconds", 12, H5T_NATIVE_UINT64);
-	if (err < 0)
-		err_handler(EIO,
-			"failed to add type info to HDF5 compound type");
-	err = H5Tinsert(type, "Value", 20, H5T_NATIVE_UINT64);
-	if (err < 0)
-		err_handler(EIO,
-			"failed to add type info to HDF5 compound type");
-
-	cpudata = malloc(cpus_online * sizeof(struct cpu_data));
-	if (!cpudata)
-		err_handler(errno, "failed to allocated memory for cpu sets\n");
-
-	for (i = 0; i < cpus_online; i++) {
-		cpudata[i].count = 0;
-		cpudata[i].data = malloc(BLOCK_SIZE * sizeof(struct latency_sample));
-
-		if (asprintf(&sid, "cpu%d\n", i) < 0)
-			err_handler(errno, "failed to create label\n");
-		cpudata[i].set = H5PTcreate(file, sid, type, (hsize_t)bs, H5P_DEFAULT);
-		free(sid);
-		if (cpudata[i].set == H5I_INVALID_HID)
-			err_handler(EIO, "failed to create HDF5 packet table");
-	}
-
-	for (;;) {
-		nr = fread(data, sizeof(struct latency_sample), bs, input);
-		if (nr != bs) {
-			if (feof(input))
-				break;
-			if (ferror(input))
-				err_handler(errno, "fread()");
+	fd = jd_fopen(info->dir, "cpus_online", "r");
+	if (!fd)
+		err_handler(errno, "Could not read %s/cpus_online\n", info->dir);
+	n = fscanf(fd, "%d\n", &info->cpus_online);
+	if (n == EOF) {
+		if (ferror(fd)) {
+			err_handler(errno, "fscanf()");
+			perror("fscanf");
+		} else {
+			fprintf(stderr, "cpus_online: No matching characters, no matching failure\n");
+			exit(1);
 		}
-
-		for (i = 0; i < nr; i++) {
-			s = &data[i];
-			if (s->cpuid >= cpus_online) {
-				fprintf(stderr, "invalid sample found (cpuid %d)\n",
-					s->cpuid);
-				continue;
-			}
-
-			cnt = cpudata[s->cpuid].count;
-			d = &(cpudata[s->cpuid].data[cnt]);
-			memcpy(d, s, sizeof(struct latency_sample));
-			cpudata[s->cpuid].count++;
-		}
-
-		for (i = 0; i < cpus_online; i++) {
-			H5PTappend(cpudata[i].set, cpudata[i].count, cpudata[i].data);
-			cpudata[i].count = 0;
-		}
+	} else if (n != 1) {
+		fprintf(stderr, "fscan() read more then one element\n");
+		exit(1);
 	}
+	fclose(fd);
 
-	free(data);
-
-	for (i = 0; i < cpus_online; i++) {
-		H5PTclose(cpudata[i].set);
-		free(cpudata[i].data);
+	if (info->cpus_online < 1) {
+		fprintf(stderr, "invalid input from cpus_online\n");
+		exit(1);
 	}
-	free(cpudata);
-
-	H5Tclose(type);
-	H5Fclose(file);
 }
 
 static void dump_samples(const char *port)
@@ -203,6 +93,22 @@ static void dump_samples(const char *port)
 	close(sk);
 }
 
+struct jd_slist jd_samples_plugins = {
+	NULL,
+};
+
+int jd_samples_register(struct jd_samples_ops *ops)
+{
+	jd_slist_append(&jd_samples_plugins, ops);
+
+	return 0;
+}
+
+void jd_samples_unregister(struct jd_samples_ops *ops)
+{
+	jd_slist_remove(&jd_samples_plugins, ops);
+}
+
 static struct option long_options[] = {
 	{ "help",	no_argument,		0,	'h' },
 	{ "version",	no_argument,		0,	 0  },
@@ -227,11 +133,12 @@ static void __attribute__((noreturn)) usage(int status)
 
 int main(int argc, char *argv[])
 {
-	FILE *input, *output, *fd;
-	char *dir;
-	int n, c, long_idx,cpus_online;
+	FILE *input;
+	int c, long_idx;
 	char *format = "csv";
 	char *port = NULL;
+	struct jd_samples_info info;
+	struct jd_slist *list;
 
 	while (1) {
 		c = getopt_long(argc, argv, "hf:l:", long_options, &long_idx);
@@ -269,57 +176,34 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Missing input DIR\n");
 		usage(1);
 	}
-	dir = argv[optind];
+	info.dir = argv[optind];
 
-	fd = jd_fopen(dir, "cpus_online", "r");
-	if (!fd)
-		err_handler(errno, "Could not read %s/cpus_online\n", dir);
-	n = fscanf(fd, "%d\n", &cpus_online);
-	if (n == EOF) {
-		if (ferror(fd)) {
-			err_handler(errno, "fscanf()");
-			perror("fscanf");
-		} else {
-			fprintf(stderr, "cpus_online: No matching characters, no matching failure\n");
-			exit(1);
-		}
-	} else if (n != 1) {
-		fprintf(stderr, "fscan() read more then one element\n");
-		exit(1);
-	}
-	fclose(fd);
+	read_online_cpus(&info);
 
-	if (cpus_online < 1) {
-		fprintf(stderr, "invalid input from cpus_online\n");
-		exit(1);
-	}
+	__jd_plugin_init();
 
-	input = jd_fopen(dir, "samples.raw", "r");
+	input = jd_fopen(info.dir, "samples.raw", "r");
 	if (!input)
-		err_handler(errno, "Could not open '%s/samples.raw' for reading", dir);
+		err_handler(errno, "Could not open '%s/samples.raw' for reading", info.dir);
 
-	if (!strcmp(format, "csv")) {
-		output = jd_fopen(dir, "samples.csv", "w");
-		if (!output)
-			err_handler(errno, "Could not open '%s/samples.csv' for writing", dir);
-		output_csv(input, output);
+	for (list = jd_samples_plugins.next; list; list = list->next) {
+		struct jd_samples_ops *plugin = list->data;
 
-		fclose(output);
-	} else if (!strcmp(format, "hdf5")) {
-		char *file;
+		if (strcmp(plugin->format, format))
+			continue;
 
-		if (asprintf(&file, "%s/samples.hdf5", dir) < 0)
-			err_handler(errno, "asprintf()");
-
-		output_hdf5(input, file, cpus_online);
-
-		free(file);
-	} else {
-		fprintf(stderr, "Unsupported file format \"%s\"\n", format);
-		exit(1);
+		plugin->output(&info, input);
+		break;
 	}
 
 	fclose(input);
+
+	__jd_plugin_cleanup();
+
+	if (!list) {
+		fprintf(stderr, "Unsupported file format \"%s\"\n", format);
+		exit(1);
+	}
 
 	return 0;
 }
