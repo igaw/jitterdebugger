@@ -16,14 +16,14 @@ TARGETS=jitterdebugger jittersamples
 
 all: $(TARGETS)
 
-jitterdebugger: jitterutils.o jitterwork.o jittersysinfo.o jitterdebugger.o
+jitterdebugger: jd_utils.o jd_work.o jd_sysinfo.o jitterdebugger.o
 
 
 jittersamples_builtin_modules = jd_samples_csv jd_samples_hdf5
 jittersamples_builtin_sources = $(addsuffix .c,$(jittersamples_builtin_modules))
 jittersamples_builtin_objs = $(addsuffix .o,$(jittersamples_builtin_modules))
 
-jittersamples_objs = jitterutils.o $(jittersamples_builtin_objs) \
+jittersamples_objs = jd_utils.o $(jittersamples_builtin_objs) \
 	jd_samples_builtin.o jd_plugin.o jittersamples.o
 
 jd_samples_builtin.c: scripts/genbuiltin $(jittersamples_builtin_sources)
