@@ -70,9 +70,6 @@ static inline long int parse_dec(const char *str)
 int sysfs_load_str(const char *path, char **buf);
 
 /* cpu_set_t helpers */
-int cpus_online(cpu_set_t *set);
-void cpuset_from_bits(cpu_set_t *set, unsigned long bits);
-unsigned long cpuset_to_bits(cpu_set_t *set);
 void cpuset_fprint(FILE *f, cpu_set_t *set);
 ssize_t cpuset_parse(cpu_set_t *set, const char *str);
 

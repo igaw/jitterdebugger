@@ -681,8 +681,8 @@ int main(int argc, char *argv[])
 	if (break_val != UINT_MAX)
 		open_trace_fds();
 
-	if (cpus_online(&affinity_available) < 0)
-		err_handler(errno, "cpus_available()");
+	if (sched_getaffinity(0, sizeof(cpu_set_t), &affinity_available))
+		err_handler(errno, "sched_getaffinity()");
 
 	if (CPU_COUNT(&affinity_set)) {
 		CPU_AND(&affinity, &affinity_set, &affinity_available);

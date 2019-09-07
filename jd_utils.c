@@ -186,24 +186,7 @@ long int parse_time(const char *str)
 	return t;
 }
 
-/* cpu_set_t helpers */
-int cpus_online(cpu_set_t *set)
-{
-	int ret;
-	char *buf;
-
-	ret = sysfs_load_str("/sys/devices/system/cpu/online", &buf);
-	if (ret < 0)
-		return ret;
-
-	CPU_ZERO(set);
-	ret = cpuset_parse(set, buf);
-	free(buf);
-
-	return ret;
-}
-
-void cpuset_from_bits(cpu_set_t *set, unsigned long bits)
+static void cpuset_from_bits(cpu_set_t *set, unsigned long bits)
 {
 	unsigned i;
 
@@ -212,7 +195,7 @@ void cpuset_from_bits(cpu_set_t *set, unsigned long bits)
 			CPU_SET(i, set);
 }
 
-unsigned long cpuset_to_bits(cpu_set_t *set)
+static unsigned long cpuset_to_bits(cpu_set_t *set)
 {
 	unsigned long bits = 0;
 	unsigned int i, t, bit;

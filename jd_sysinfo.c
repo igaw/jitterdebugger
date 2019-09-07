@@ -35,8 +35,8 @@ struct system_info *collect_system_info(void)
 	info->version = jd_strdup(buf.version);
 	info->machine = jd_strdup(buf.machine);
 
-	if (cpus_online(&set) < 0)
-		err_handler(errno, "cpus_online()");
+	if (sched_getaffinity(0, sizeof(cpu_set_t), &set))
+		err_handler(errno, "sched_getaffinity()");
 
 	info->cpus_online = CPU_COUNT(&set);
 
