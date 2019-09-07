@@ -233,12 +233,16 @@ static void store_file(struct record_data *rec)
 {
 	struct stats *s = rec->stats;
 	struct latency_sample sample;
+	struct timespec ts;
+	uint64_t val;
 	unsigned int i;
 
 	while (!READ_ONCE(jd_shutdown)) {
 		for (i = 0; i < num_threads; i++) {
 			sample.cpuid = i;
-			while (!ringbuffer_read(s[i].rb, &sample.ts, &sample.val)) {
+			while (!ringbuffer_read(s[i].rb, &ts, &val)) {
+				memcpy(&sample.ts, &ts, sizeof(sample.ts));
+				memcpy(&sample.val, &val, sizeof(sample.val));
 				fwrite(&sample, sizeof(struct latency_sample), 1, rec->fd);
 			}
 		}
@@ -256,6 +260,8 @@ static void store_network(struct record_data *rec)
 	int err, sk, len;
 	unsigned int i, c;
 	struct stats *s = rec->stats;
+	struct timespec ts;
+	uint64_t val;
 
 	bzero(&hints, sizeof(struct addrinfo));
 	hints.ai_family = AF_UNSPEC;
@@ -289,8 +295,10 @@ static void store_network(struct record_data *rec)
 	c = 0;
 	while (!READ_ONCE(jd_shutdown)) {
 		for (i = 0; i < num_threads; i++) {
-			while (!ringbuffer_read(s[i].rb, &sp[c].ts, &sp[c].val)) {
+			while (!ringbuffer_read(s[i].rb, &ts, &val)) {
 				sp[c].cpuid = i;
+				memcpy(&sp[c].ts, &ts, sizeof(sp[c].ts));
+				memcpy(&sp[c].val, &val, sizeof(sp[c].val));
 				if (c == SAMPLES_PER_PACKET - 1) {
 					len = sendto(sk, (const void *)sp, sizeof(sp), 0,
 						sa, salen);
