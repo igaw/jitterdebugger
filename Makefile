@@ -19,7 +19,16 @@ all: $(TARGETS)
 jitterdebugger: jd_utils.o jd_work.o jd_sysinfo.o jitterdebugger.o
 
 
-jittersamples_builtin_modules = jd_samples_csv jd_samples_hdf5
+jittersamples_builtin_modules = jd_samples_csv
+
+# Determine if HDF5 support will be built into jittersamples
+JSCC=${CC}
+ifneq ("$(wildcard /usr/include/hdf5.h)", "")
+	CFLAGS += -DCONFIG_HDF5
+	JSCC = h5cc -shlib
+	jittersamples_builtin_modules += jd_samples_hdf5
+endif
+
 jittersamples_builtin_sources = $(addsuffix .c,$(jittersamples_builtin_modules))
 jittersamples_builtin_objs = $(addsuffix .o,$(jittersamples_builtin_modules))
 
@@ -30,9 +39,9 @@ jd_samples_builtin.c: scripts/genbuiltin $(jittersamples_builtin_sources)
 	scripts/genbuiltin $(jittersamples_builtin_modules) > $@
 $(jittersamples_objs): %.o: %.c
 	export HDF5_CC=${CC}
-	h5cc ${CFLAGS} -D_FILENAME=$(basename $<) -c $< -o $@
+	$(JSCC) ${CFLAGS} -D_FILENAME=$(basename $<) -c $< -o $@
 jittersamples: $(jittersamples_objs)
-	h5cc -shlib $^ -o $@
+	$(JSCC) $^ -o $@
 
 
 PHONY: .clean
