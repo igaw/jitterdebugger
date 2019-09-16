@@ -33,7 +33,6 @@
 
 #define NSEC_PER_SEC		1000000000
 #define NSEC_PER_US		1000UL
-#define HIST_MAX_ENTRIES	1000
 
 /* Default test interval in us */
 #define DEFAULT_INTERVAL        1000
@@ -42,9 +41,9 @@ struct stats {
 	pthread_t pid;
 	pid_t tid;
 	unsigned int affinity;
-	unsigned int max;	/* in us */
-	unsigned int min;	/* in us */
-	unsigned int avg;	/* in us */
+	uint64_t max;
+	uint64_t min;
+	uint64_t avg;
 	unsigned int hist_size;
 	uint64_t *hist;		/* each slot is one us */
 	uint64_t total;
@@ -63,8 +62,9 @@ static int jd_shutdown;
 static cpu_set_t affinity;
 static unsigned int num_threads;
 static unsigned int priority = 80;
-static unsigned int break_val = UINT_MAX;
+static uint64_t break_val = UINT64_MAX;
 static unsigned int sleep_interval_us = DEFAULT_INTERVAL;
+static unsigned int interval_resolution = NSEC_PER_US;
 static unsigned int max_loops = 0;
 static int trace_fd = -1;
 static int tracemark_fd = -1;
@@ -81,8 +81,7 @@ static inline int64_t ts_sub(struct timespec t1, struct timespec t2)
 	diff = NSEC_PER_SEC * (int64_t)((int) t1.tv_sec - (int) t2.tv_sec);
 	diff += ((int) t1.tv_nsec - (int) t2.tv_nsec);
 
-	/* Return diff in us */
-	return diff / 1000;
+	return diff / interval_resolution;
 }
 
 static inline struct timespec ts_add(struct timespec t1, struct timespec t2)
@@ -158,14 +157,15 @@ static void dump_stats(FILE *f, struct system_info *sysinfo, struct stats *s)
 	unsigned int i, j, comma;
 
 	fprintf(f, "{\n");
-	fprintf(f, "  \"version\": 2,\n");
+	fprintf(f, "  \"version\": 3,\n");
 	fprintf(f, "  \"sysinfo\": {\n");
 	fprintf(f, "    \"sysname\": \"%s\",\n", sysinfo->sysname);
 	fprintf(f, "    \"nodename\": \"%s\",\n", sysinfo->nodename);
 	fprintf(f, "    \"release\": \"%s\",\n", sysinfo->release);
 	fprintf(f, "    \"version\": \"%s\",\n", sysinfo->version);
 	fprintf(f, "    \"machine\": \"%s\",\n", sysinfo->machine);
-	fprintf(f, "    \"cpus_online\": %d\n", sysinfo->cpus_online);
+	fprintf(f, "    \"cpus_online\": %d,\n", sysinfo->cpus_online);
+	fprintf(f, "    \"resolution_in_ns\": %u\n", interval_resolution);
 	fprintf(f, "  },\n");
 	fprintf(f, "  \"cpu\": {\n");
 	for (i = 0; i < num_threads; i++) {
@@ -183,8 +183,8 @@ static void dump_stats(FILE *f, struct system_info *sysinfo, struct stats *s)
 			fprintf(f, "\n");
 		fprintf(f, "      },\n");
 		fprintf(f, "      \"count\": %" PRIu64 ",\n", s[i].count);
-		fprintf(f, "      \"min\": %u,\n", s[i].min);
-		fprintf(f, "      \"max\": %u,\n", s[i].max);
+		fprintf(f, "      \"min\": %" PRIu64 ",\n", s[i].min);
+		fprintf(f, "      \"max\": %" PRIu64 ",\n", s[i].max);
 		fprintf(f, "      \"avg\": %.2f\n",
 			(double)s[i].total / (double)s[i].count);
 		fprintf(f, "    }%s\n", i == num_threads - 1 ? "" : ",");
@@ -199,7 +199,7 @@ static void __display_stats(struct stats *s)
 
 	for (i = 0; i < num_threads; i++) {
 		printf("T:%2u (%5lu) A:%2u C:%10" PRIu64
-			" Min:%10u Avg:%8.2f Max:%10u "
+			" Min:%10" PRIu64 " Avg:%8.2f Max:%10" PRIu64 " "
 			VT100_ERASE_EOL "\n",
 			i, (long)s[i].tid, s[i].affinity,
 			s[i].count,
@@ -416,9 +416,9 @@ static void start_measuring(struct stats *s, struct record_data *rec)
 
 		/* Don't stay on the same core in next loop */
 		s[i].affinity = t++;
-		s[i].min = UINT_MAX;
-		s[i].hist_size = HIST_MAX_ENTRIES;
-		s[i].hist = calloc(HIST_MAX_ENTRIES, sizeof(uint64_t));
+		s[i].min = UINT64_MAX;
+		s[i].hist_size = NSEC_PER_SEC / interval_resolution / 1000;
+		s[i].hist = calloc(s[i].hist_size, sizeof(uint64_t));
 		if (!s[i].hist)
 			err_handler(errno, "calloc()");
 
@@ -463,11 +463,11 @@ static struct option long_options[] = {
 	{ "verbose",	no_argument,		0,	'v' },
 	{ "version",	no_argument,		0,	 0  },
 	{ "command",	required_argument,	0,	'c' },
-	{ NULL,		required_argument,	0,	'N' },
 
 	{ "loops",	required_argument,	0,	'l' },
 	{ "duration",	required_argument,	0,	'D' },
 	{ "break",	required_argument,	0,	'b' },
+	{ "nsec",	no_argument,		0,	'N' },
 	{ "interval",	required_argument,	0,	'i' },
 	{ "output",	required_argument,	0,	'o' },
 
@@ -494,7 +494,9 @@ static void __attribute__((noreturn)) usage(int status)
 	printf("                        Append 'm', 'h', or 'd' to specify minutes, hours or days.\n");
 	printf("  -b, --break VALUE     Stop if max latency exceeds VALUE.\n");
 	printf("                        Also the tracers\n");
-	printf("  -i, --interval USEC   Sleep interval for sampling threads in microseconds\n");
+	printf("  -N, --nsec            Meassurement in nano seconds\n");
+	printf("  -i, --interval TIME   Sleep interval for sampling threads in microseconds\n");
+	printf("                        or nano seconds (see -N/--nsec)\n");
 	printf("  -n			Send samples to host:port\n");
 	printf("  -s			Store samples into --output DIR\n");
 	printf("\n");
@@ -533,7 +535,7 @@ int main(int argc, char *argv[])
 	CPU_ZERO(&affinity_set);
 
 	while (1) {
-		c = getopt_long(argc, argv, "c:n:sp:vD:l:b:i:o:a:h", long_options,
+		c = getopt_long(argc, argv, "c:n:sp:vD:l:b:Ni:o:a:h", long_options,
 				&long_idx);
 		if (c < 0)
 			break;
@@ -589,12 +591,15 @@ int main(int argc, char *argv[])
 					  "Valid range is [1..]\n");
 			break_val = val;
 			break;
+		case 'N':
+			interval_resolution = 1;
+			break;
 		case 'i':
 			val = parse_dec(optarg);
 			if (val < 1)
 				err_abort("Invalid value for interval. "
 					  "Valid range is [1..]. "
-					  "Default: %u.\n", sleep_interval_us);
+					  "Default: %u us.\n", sleep_interval_us);
 			sleep_interval_us = val;
 			break;
 		case 'h':
@@ -686,7 +691,7 @@ int main(int argc, char *argv[])
 
 	fd = c_states_disable();
 
-	if (break_val != UINT_MAX)
+	if (break_val != UINT64_MAX)
 		open_trace_fds();
 
 	if (sched_getaffinity(0, sizeof(cpu_set_t), &affinity_available))
@@ -772,9 +777,13 @@ int main(int argc, char *argv[])
 
 	if (opt_verbose && break_val != UINT_MAX) {
 		for (i = 0; i < num_threads; i++) {
-			if (s[i].max > break_val)
-				printf("Thread %lu on CPU %u hit %u us latency\n",
-					(long)s[i].tid, i, s[i].max);
+			if (s[i].max > break_val) {
+				const char *unit = "us";
+				if (interval_resolution == 1)
+					unit = "ns";
+				printf("Thread %lu on CPU %u hit %lu %s latency\n",
+					(long)s[i].tid, i, s[i].max, unit);
+			}
 		}
 	}
 
