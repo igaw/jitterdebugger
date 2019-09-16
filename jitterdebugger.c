@@ -617,7 +617,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (geteuid() != 0)
-		printf("jitterdebugger is not running with root rights.");
+		printf("jitterdebugger is not running with root rights.\n");
 
 	sysinfo = collect_system_info();
 	if (opt_dir) {
