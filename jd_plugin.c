@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+#include <strings.h>
+
 #include "jitterdebugger.h"
 
 extern struct jd_plugin_desc *__jd_builtin[];
@@ -17,6 +19,7 @@ void jd_slist_append(struct jd_slist *jd_slist, void *data)
 	l->next = malloc(sizeof(struct jd_slist));
 	if (!l->next)
 		err_abort("allocation for link list failed");
+	bzero(l->next, sizeof(*l->next));
 
 	l->next->data = data;
 }
