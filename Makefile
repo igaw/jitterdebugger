@@ -48,3 +48,4 @@ PHONY: .clean
 clean:
 	rm -f *.o
 	rm -f $(TARGETS)
+	rm -f jd_samples_builtin.c
