@@ -146,9 +146,12 @@ static void stop_tracer(uint64_t diff)
 	write(trace_fd, "0\n", 2);
 }
 
-static pid_t gettid(void)
+static inline pid_t __gettid(void)
 {
-	/* No glibc wrapper available */
+	/*
+	 * glibc wrapper available since glibc-2.30, but use our own
+	 * implementation for compatibility with older versions.
+	 */
 	return syscall(SYS_gettid);
 }
 
@@ -340,7 +343,7 @@ static void *worker(void *arg)
 	if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
 		err_handler(errno, "sigprocmask()");
 
-	s->tid = gettid();
+	s->tid = __gettid();
 
 	interval.tv_sec = 0;
 	interval.tv_nsec = sleep_interval_us * NSEC_PER_US;
