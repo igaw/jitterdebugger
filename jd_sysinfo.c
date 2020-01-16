@@ -8,6 +8,7 @@
 #include <libgen.h>
 #include <sys/utsname.h>
 #include <sys/klog.h>
+#include <sys/sysinfo.h>
 
 #include "jitterdebugger.h"
 
@@ -18,7 +19,6 @@ struct system_info *collect_system_info(void)
 {
 	struct system_info *info;
 	struct utsname buf;
-	cpu_set_t set;
 	int err;
 
 	info = malloc(sizeof(*info));
@@ -35,10 +35,7 @@ struct system_info *collect_system_info(void)
 	info->version = jd_strdup(buf.version);
 	info->machine = jd_strdup(buf.machine);
 
-	if (sched_getaffinity(0, sizeof(cpu_set_t), &set))
-		err_handler(errno, "sched_getaffinity()");
-
-	info->cpus_online = CPU_COUNT(&set);
+	info->cpus_online = get_nprocs();
 
 	return info;
 }

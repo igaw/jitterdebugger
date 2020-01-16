@@ -454,6 +454,9 @@ static void start_measuring(struct stats *s, struct record_data *rec)
 			if (err == EPERM)
 				fprintf(stderr, "No permission to set the "
 					"scheduling policy and/or priority\n");
+			else if (err == EINVAL)
+				fprintf(stderr, "Invalid settings in thread attributes. "
+					"Check your affinity mask\n");
 			err_handler(err, "pthread_create()");
 		}
 	}
@@ -697,15 +700,18 @@ int main(int argc, char *argv[])
 	if (break_val != UINT64_MAX)
 		open_trace_fds();
 
-	if (sched_getaffinity(0, sizeof(cpu_set_t), &affinity_available))
-		err_handler(errno, "sched_getaffinity()");
-
 	if (CPU_COUNT(&affinity_set)) {
-		CPU_AND(&affinity, &affinity_set, &affinity_available);
-		if (!CPU_EQUAL(&affinity, &affinity_set))
-			printf("warning: affinity reduced\n");
-	} else
+		/*
+		 * The user is able to override the affinity mask with
+		 * a set which contains more CPUs than
+		 * sched_getaffinity() returns.
+		 */
+		affinity = affinity_set;
+	} else {
+		if (sched_getaffinity(0, sizeof(cpu_set_t), &affinity_available))
+			err_handler(errno, "sched_getaffinity()");
 		affinity = affinity_available;
+	}
 
 	if (opt_verbose) {
 		printf("affinity: ");
