@@ -352,7 +352,7 @@ static void *worker(void *arg)
 	if (err)
 		err_handler(err, "clock_gettime()");
 
-	next = ts_add(now, interval);
+	next = now;
 
 	while (!READ_ONCE(jd_shutdown)) {
 		next = ts_add(next, interval);
