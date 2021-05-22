@@ -790,7 +790,7 @@ int main(int argc, char *argv[])
 				const char *unit = "us";
 				if (interval_resolution == 1)
 					unit = "ns";
-				printf("Thread %lu on CPU %u hit %lu %s latency\n",
+				printf("Thread %lu on CPU %u hit %" PRIu64 " %s latency\n",
 					(long)s[i].tid, i, s[i].max, unit);
 			}
 		}
