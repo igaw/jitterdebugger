@@ -804,7 +804,7 @@ int main(int argc, char *argv[])
 	free(s);
 
 	if (tracemark_fd > 0)
-		close(trace_fd);
+		close(tracemark_fd);
 
 	if (trace_fd > 0)
 		close(trace_fd);
