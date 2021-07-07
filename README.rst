@@ -19,24 +19,6 @@ measurement out of the box.
 Furthermore, the tool supports storing all samples for post
 processing.
 
-
-############
-Build status
-############
-
-+------------+------------------+
-|   Branch   |   Build Status   |
-+============+==================+
-| ``master`` | |travis-master|_ |
-+------------+------------------+
-| ``next``   | |travis-next|_   |
-+------------+------------------+
-
-.. |travis-master| image:: https://travis-ci.org/igaw/jitterdebugger.svg?branch=master
-.. _travis-master: https://travis-ci.org/igaw/jitterdebugger/branches
-.. |travis-next| image:: https://travis-ci.org/igaw/jitterdebugger.svg?branch=next
-.. _travis-next: https://travis-ci.org/igaw/jitterdebugger/branches
-
 #################
 Runtime Depenency
 #################
