@@ -20,16 +20,23 @@ Show help text and exit.
 .TP
 .BI "--version"
 Show jitterplot version.
+.TP
+.BI "--output <file>"
+Filename to save the figure to, for non-interactive plotting. The format
+can be controlled via the file extension (e.g. "png", "pdf", "svg")
+
 .SH EXAMPLES
 .EX
 # jitterdebugger -f results.json
 ^C
 # jitterplot hist results.json
+# jitterplot --output /tmp/hist.pdf hist results.json
 
 # jitterdebugger -o samples.raw
 ^C
 # jittersamples samples.raw > samples.txt
 # jitterplot samples samples.txt
+# jitterplot --output /tmp/samples.png samples samples.txt
 .EE
 .SH SEE ALSO
 .ad l
