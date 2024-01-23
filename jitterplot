@@ -16,6 +16,47 @@ __version__ = '0.3'
 pd.options.mode.chained_assignment = None
 
 
+def plot_cdf(filename, outfilename):
+    with open(filename) as file:
+        rawdata = json.load(file)
+
+    cpu_id = 0
+    fig, ax = plt.subplots()
+    while True:
+        if str(cpu_id) not in rawdata['cpu']:
+            break
+
+        cid = str(cpu_id)
+        data = rawdata['cpu'][cid]
+        bins = [int(i) for i in data['histogram'].keys()]
+
+        values = [int(i) for i in data['histogram'].values()]
+        cumulative = np.cumsum(values) / np.sum(values)
+        # show 99.9 and 99.99 percentiles in legend
+        p3_idx = list(map(lambda i: i > 0.999, cumulative)).index(True)
+        p4_idx = list(map(lambda i: i > 0.9999, cumulative)).index(True)
+        p3 = bins[p3_idx]
+        p4 = bins[p4_idx]
+        pmax = bins[-1]
+        ax.step(bins, cumulative,
+                label='cpu{}: p99.9={}, p99.99={}, max={}'
+                      .format(cid, p3, p4, pmax))
+
+        cpu_id = cpu_id + 1
+
+    L = ax.legend()
+    plt.xscale('log')
+    plt.grid(color='lightgrey', linestyle='-', linewidth=1, which='both')
+    plt.yticks(ticks=np.arange(0, 1.1, 0.1))
+    plt.xlabel('jitter [us]')
+    plt.ylabel('CDF')
+
+    plt.setp(L.texts, family='monospace')
+    if outfilename is not None:
+        plt.savefig(outfilename)
+    plt.show()
+
+
 def plot_histogram(filename, outfilename):
     with open(filename) as file:
         rawdata = json.load(file)
@@ -88,6 +129,9 @@ def main():
     hrs = sap.add_parser('hist', help='Print historgram')
     hrs.add_argument('HIST_FILE')
 
+    crs = sap.add_parser('cdf', help='Plot cumulative densitiy function')
+    crs.add_argument('CDF_FILE')
+
     srs = sap.add_parser('samples', help='Plot samples graph')
     srs.add_argument('SAMPLE_FILE')
 
@@ -97,6 +141,11 @@ def main():
         if os.path.isdir(fname):
             fname = fname + '/results.json'
         plot_histogram(fname, args.output)
+    elif args.cmd == 'cdf':
+        fname = args.CDF_FILE
+        if os.path.isdir(fname):
+            fname = fname + '/results.json'
+        plot_cdf(fname, args.output)
     elif args.cmd == 'samples':
         fname = args.SAMPLE_FILE
         if os.path.isdir(fname):
