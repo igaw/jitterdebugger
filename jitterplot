@@ -15,6 +15,7 @@ __version__ = '0.3'
 # https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#evaluation-order-matters
 pd.options.mode.chained_assignment = None
 
+
 def plot_histogram(filename, outfilename):
     with open(filename) as file:
         rawdata = json.load(file)
@@ -28,12 +29,13 @@ def plot_histogram(filename, outfilename):
         cid = str(cpu_id)
         data = rawdata['cpu'][cid]
         d = {int(k): int(v) for k, v in data['histogram'].items()}
-        l = 'cpu{} min{:>3} avg{:>7} max{:>3}'.format(
+        lbl = 'cpu{} min{:>3} avg{:>7} max{:>3}'.format(
             cid,
             rawdata['cpu'][cid]['min'],
             rawdata['cpu'][cid]['avg'],
             rawdata['cpu'][cid]['max'])
-        ax.bar(list(d.keys()), list(d.values()), log=True, alpha=0.5, label=l)
+        ax.bar(list(d.keys()), list(d.values()),
+               log=True, alpha=0.5, label=lbl)
 
         cpu_id = cpu_id + 1
 
@@ -43,6 +45,7 @@ def plot_histogram(filename, outfilename):
         plt.savefig(outfilename)
     plt.show()
 
+
 def load_samples(filename):
     dt = np.dtype([('CPUID', 'u4'),
                    ('Seconds', 'u8'),
@@ -51,6 +54,7 @@ def load_samples(filename):
     data = np.fromfile(filename, dtype=dt)
     df = pd.DataFrame(data)
     return df
+
 
 def plot_all_cpus(df, outfilename):
     ids = df["CPUID"].unique()
@@ -73,7 +77,8 @@ def plot_all_cpus(df, outfilename):
 
 
 def main():
-    ap = argparse.ArgumentParser(description='Plot statistics collected with jitterdebugger')
+    ap = argparse.ArgumentParser(
+        description='Plot statistics collected with jitterdebugger')
     ap.add_argument('--version', action='version',
                     version='%(prog)s ' + __version__)
     ap.add_argument('--output', help='output file name to save figure',
@@ -99,6 +104,7 @@ def main():
 
         df = load_samples(fname)
         plot_all_cpus(df, args.output)
+
 
 if __name__ == '__main__':
     main()
