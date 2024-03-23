@@ -45,11 +45,10 @@ def plot_cdf(filename, outfilename):
         cpu_id = cpu_id + 1
 
     L = ax.legend()
-    plt.xscale('log')
     plt.grid(color='lightgrey', linestyle='-', linewidth=1, which='both')
     plt.yticks(ticks=np.arange(0, 1.1, 0.1))
     plt.xlabel('jitter [us]')
-    plt.ylabel('CDF')
+    plt.ylabel('probability')
 
     plt.setp(L.texts, family='monospace')
     if outfilename is not None:
@@ -82,6 +81,8 @@ def plot_histogram(filename, outfilename):
 
     L = ax.legend()
     plt.setp(L.texts, family='monospace')
+    plt.xlabel('jitter [us]')
+    plt.ylabel('frequency')
     if outfilename is not None:
         plt.savefig(outfilename)
     plt.show()
