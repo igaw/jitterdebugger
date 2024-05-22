@@ -103,11 +103,15 @@ static int c_states_disable(void)
 	int fd;
 
 	/* Disable on all CPUs all C states. */
-	fd = TEMP_FAILURE_RETRY(open("/dev/cpu_dma_latency",
-						O_RDWR | O_CLOEXEC));
+	const char *cpu_dma_latency = "/dev/cpu_dma_latency";
+
+	fd = TEMP_FAILURE_RETRY(open(cpu_dma_latency, O_RDWR | O_CLOEXEC));
 	if (fd < 0) {
-		if (errno == EACCES)
-			fprintf(stderr, "No permission to open /dev/cpu_dma_latency\n");
+		if (errno == EACCES) {
+			fprintf(stderr, "No permission to open %s\n", cpu_dma_latency);
+		} else if (errno == ENOENT) {
+			return fd;
+		}
 		err_handler(errno, "open()");
 	}
 
@@ -119,7 +123,8 @@ static int c_states_disable(void)
 static void c_states_enable(int fd)
 {
 	/* By closing the fd, the PM settings are restored. */
-	close(fd);
+	if (fd >= 0)
+		close(fd);
 }
 
 static void open_trace_fds(void)
