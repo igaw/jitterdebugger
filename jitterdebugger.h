@@ -14,6 +14,15 @@
 // Results in a 1400 bytes payload per UDP packet
 #define SAMPLES_PER_PACKET 50
 
+#ifndef TEMP_FAILURE_RETRY
+# define TEMP_FAILURE_RETRY(expression) \
+	(__extension__ \
+		({ long int __result; \
+			do __result = (long int) (expression); \
+			while (__result == -1L && errno == EINTR); \
+			__result; }))
+#endif
+
 #define READ_ONCE(x)							\
 ({									\
 	union { typeof(x) __v; char __t[1]; } __u = { .__t = { 0 } };	\
