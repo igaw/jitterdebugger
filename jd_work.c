@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+#define _GNU_SOURCE
+
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <unistd.h>
