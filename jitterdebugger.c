@@ -338,14 +338,21 @@ static void *worker(void *arg)
 {
 	struct stats *s = arg;
 	struct timespec now, next, interval;
-	sigset_t mask;
+	sigset_t signal_mask;
+	cpu_set_t cpu_mask;
 	uint64_t diff;
 	int err;
 
 	/* Don't handle any signals */
-	sigfillset(&mask);
-	if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+	sigfillset(&signal_mask);
+	if (sigprocmask(SIG_BLOCK, &signal_mask, NULL) < 0)
 		err_handler(errno, "sigprocmask()");
+
+	CPU_ZERO(&cpu_mask);
+	CPU_SET(s->affinity, &cpu_mask);
+	err = pthread_setaffinity_np(pthread_self(), sizeof(cpu_mask), &cpu_mask);
+	if (err)
+		err_handler(err, "pthread_setaffinity_np()");
 
 	s->tid = __gettid();
 
@@ -403,23 +410,18 @@ static void start_measuring(struct stats *s, struct record_data *rec)
 {
 	struct sched_param sched;
 	pthread_attr_t attr;
-	cpu_set_t mask;
 	unsigned int i, t;
 	int err;
 
 	pthread_attr_init(&attr);
 
 	for (i = 0, t = 0; i < num_threads; i++) {
-		CPU_ZERO(&mask);
-
 		/*
 		 * Skip unset cores. will not crash as long as
 		 * num_threads <= CPU_COUNT(&affinity)
 		 */
 		while (!CPU_ISSET(t, &affinity))
 			t++;
-
-		CPU_SET(t, &mask);
 
 		/* Don't stay on the same core in next loop */
 		s[i].affinity = t++;
@@ -434,10 +436,6 @@ static void start_measuring(struct stats *s, struct record_data *rec)
 			if (!s[i].rb)
 				err_handler(ENOMEM, "ringbuffer_create()");
 		}
-
-		err = pthread_attr_setaffinity_np(&attr, sizeof(mask), &mask);
-		if (err)
-			err_handler(err, "pthread_attr_setaffinity_np()");
 
 		err = pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 		if (err)
@@ -459,8 +457,7 @@ static void start_measuring(struct stats *s, struct record_data *rec)
 				fprintf(stderr, "No permission to set the "
 					"scheduling policy and/or priority\n");
 			else if (err == EINVAL)
-				fprintf(stderr, "Invalid settings in thread attributes. "
-					"Check your affinity mask\n");
+				fprintf(stderr, "Invalid settings in thread attributes\n");
 			err_handler(err, "pthread_create()");
 		}
 	}
