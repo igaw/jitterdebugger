@@ -12,6 +12,10 @@ else
 	CFLAGS += -O2
 endif
 
+ifdef CACHELINE_SIZE
+	CFLAGS += -DCACHELINE_SIZE=$(CACHELINE_SIZE)
+endif
+
 TARGETS=jitterdebugger jittersamples
 
 all: $(TARGETS)

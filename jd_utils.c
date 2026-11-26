@@ -18,17 +18,42 @@
 
 #define BUFSIZE		4096
 
+#ifndef CACHELINE_SIZE
+#if defined(__x86_64__) || defined(__i386__)
+/* adjacent-line prefetcher pulls in pairs of 64 byte lines */
+#define CACHELINE_SIZE	128
+#elif defined(__aarch64__) || defined(__powerpc64__)
+#define CACHELINE_SIZE	128
+#elif defined(__s390x__)
+#define CACHELINE_SIZE	256
+#else
+#define CACHELINE_SIZE	64
+#endif
+#endif
+
+_Static_assert(CACHELINE_SIZE >= sizeof(void *) &&
+	       (CACHELINE_SIZE & (CACHELINE_SIZE - 1)) == 0,
+	       "CACHELINE_SIZE must be a power of 2");
+
 struct ringbuffer_sample {
 	struct timespec ts;
 	uint64_t val;
 };
 
+/*
+ * Single producer, single consumer. Each side keeps its index and a
+ * cached copy of the other side's index on its own cache line.
+ */
 struct ringbuffer {
 	uint32_t size;
-	uint64_t overflow;
-	uint32_t read;
-	uint32_t write;
 	struct ringbuffer_sample *data;
+
+	uint32_t write __attribute__((aligned(CACHELINE_SIZE)));
+	uint32_t read_cache;
+	uint64_t overflow;
+
+	uint32_t read __attribute__((aligned(CACHELINE_SIZE)));
+	uint32_t write_cache;
 };
 
 static int ringbuffer_full(uint32_t size, uint32_t read, uint32_t write)
@@ -49,14 +74,15 @@ static uint32_t ringbuffer_mask(uint32_t size, uint32_t idx)
 struct ringbuffer *ringbuffer_create(unsigned int size)
 {
 	struct ringbuffer *rb;
+	void *p;
 
 	/* Power of 2, at most 2^31 so that 'write - read' is unambiguous */
 	if (size == 0 || (size & (size - 1)) != 0 || size > (1U << 31))
 		return NULL;
 
-	rb = calloc(1, sizeof(*rb));
-	if (!rb)
+	if (posix_memalign(&p, CACHELINE_SIZE, sizeof(*rb)))
 		return NULL;
+	rb = memset(p, 0, sizeof(*rb));
 
 	rb->size = size;
 	rb->data = calloc(rb->size, sizeof(struct ringbuffer_sample));
@@ -81,13 +107,15 @@ uint64_t ringbuffer_overflow(struct ringbuffer *rb)
 
 int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val)
 {
-	uint32_t read, idx;
+	uint32_t idx;
 
-	read = __atomic_load_n(&rb->read, __ATOMIC_ACQUIRE);
-	if (ringbuffer_full(rb->size, read, rb->write)) {
-		__atomic_store_n(&rb->overflow, rb->overflow + 1,
-				 __ATOMIC_RELAXED);
-		return 1;
+	if (ringbuffer_full(rb->size, rb->read_cache, rb->write)) {
+		rb->read_cache = __atomic_load_n(&rb->read, __ATOMIC_ACQUIRE);
+		if (ringbuffer_full(rb->size, rb->read_cache, rb->write)) {
+			__atomic_store_n(&rb->overflow, rb->overflow + 1,
+					 __ATOMIC_RELAXED);
+			return 1;
+		}
 	}
 
 	idx = ringbuffer_mask(rb->size, rb->write + 1);
@@ -100,11 +128,13 @@ int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val)
 
 int ringbuffer_read(struct ringbuffer *rb, struct timespec *ts, uint64_t *val)
 {
-	uint32_t write, idx;
+	uint32_t idx;
 
-	write = __atomic_load_n(&rb->write, __ATOMIC_ACQUIRE);
-	if (ringbuffer_empty(rb->read, write))
-		return 1;
+	if (ringbuffer_empty(rb->read, rb->write_cache)) {
+		rb->write_cache = __atomic_load_n(&rb->write, __ATOMIC_ACQUIRE);
+		if (ringbuffer_empty(rb->read, rb->write_cache))
+			return 1;
+	}
 
 	idx = ringbuffer_mask(rb->size, rb->read + 1);
 	*ts = rb->data[idx].ts;
