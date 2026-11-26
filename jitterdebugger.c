@@ -647,9 +647,9 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		rec = malloc(sizeof(*rec));
+		rec = calloc(1, sizeof(*rec));
 		if (!rec)
-			err_handler(ENOMEM, "malloc()");
+			err_handler(ENOMEM, "calloc()");
 
 		if (opt_net) {
 			rec->server = strtok(opt_net, " :");
