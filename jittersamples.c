@@ -86,7 +86,7 @@ static void dump_samples(const char *port)
 			continue;
 		}
 		wlen = fwrite(sp, sizeof(sp), 1, stdout);
-		if (wlen != sizeof(sp))
+		if (wlen != 1)
 			err_handler(errno, "fwrite()");
 	}
 
