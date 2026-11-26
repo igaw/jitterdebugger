@@ -50,8 +50,8 @@ struct ringbuffer *ringbuffer_create(unsigned int size)
 {
 	struct ringbuffer *rb;
 
-	/* Size needs to be of power of 2 */
-	if ((size & (size - 1)) != 0)
+	/* Power of 2, at most 2^31 so that 'write - read' is unambiguous */
+	if (size == 0 || (size & (size - 1)) != 0 || size > (1U << 31))
 		return NULL;
 
 	rb = calloc(1, sizeof(*rb));
@@ -60,6 +60,10 @@ struct ringbuffer *ringbuffer_create(unsigned int size)
 
 	rb->size = size;
 	rb->data = calloc(rb->size, sizeof(struct ringbuffer_sample));
+	if (!rb->data) {
+		free(rb);
+		return NULL;
+	}
 
 	return rb;
 }
