@@ -799,8 +799,15 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < num_threads; i++) {
 		free(s[i].hist);
-		if (s[i].rb)
+		if (s[i].rb) {
+			uint64_t lost = ringbuffer_overflow(s[i].rb);
+
+			if (lost)
+				fprintf(stderr, "T:%2u lost %" PRIu64
+					" samples (ring buffer full)\n",
+					i, lost);
 			ringbuffer_free(s[i].rb);
+		}
 	}
 	free(s);
 

@@ -25,7 +25,7 @@ struct ringbuffer_sample {
 
 struct ringbuffer {
 	uint32_t size;
-	uint32_t overflow;
+	uint64_t overflow;
 	uint32_t read;
 	uint32_t write;
 	struct ringbuffer_sample *data;
@@ -74,13 +74,19 @@ void ringbuffer_free(struct ringbuffer *rb)
 	free(rb);
 }
 
+uint64_t ringbuffer_overflow(struct ringbuffer *rb)
+{
+	return __atomic_load_n(&rb->overflow, __ATOMIC_RELAXED);
+}
+
 int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val)
 {
 	uint32_t read, idx;
 
 	read = __atomic_load_n(&rb->read, __ATOMIC_ACQUIRE);
 	if (ringbuffer_full(rb->size, read, rb->write)) {
-		rb->overflow++;
+		__atomic_store_n(&rb->overflow, rb->overflow + 1,
+				 __ATOMIC_RELAXED);
 		return 1;
 	}
 
