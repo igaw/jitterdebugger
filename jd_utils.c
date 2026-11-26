@@ -78,7 +78,7 @@ int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val)
 {
 	uint32_t read, idx;
 
-	read = READ_ONCE(rb->read);
+	read = __atomic_load_n(&rb->read, __ATOMIC_ACQUIRE);
 	if (ringbuffer_full(rb->size, read, rb->write)) {
 		rb->overflow++;
 		return 1;
@@ -88,7 +88,7 @@ int ringbuffer_write(struct ringbuffer *rb, struct timespec ts, uint64_t val)
 	rb->data[idx].ts = ts;
 	rb->data[idx].val = val;
 
-	WRITE_ONCE(rb->write, rb->write + 1);
+	__atomic_store_n(&rb->write, rb->write + 1, __ATOMIC_RELEASE);
 	return 0;
 }
 
@@ -96,7 +96,7 @@ int ringbuffer_read(struct ringbuffer *rb, struct timespec *ts, uint64_t *val)
 {
 	uint32_t write, idx;
 
-	write = READ_ONCE(rb->write);
+	write = __atomic_load_n(&rb->write, __ATOMIC_ACQUIRE);
 	if (ringbuffer_empty(rb->read, write))
 		return 1;
 
@@ -104,7 +104,7 @@ int ringbuffer_read(struct ringbuffer *rb, struct timespec *ts, uint64_t *val)
 	*ts = rb->data[idx].ts;
 	*val = rb->data[idx].val;
 
-	WRITE_ONCE(rb->read, rb->read + 1);
+	__atomic_store_n(&rb->read, rb->read + 1, __ATOMIC_RELEASE);
 	return 0;
 }
 
