@@ -55,6 +55,7 @@ struct record_data {
 	char *server;
 	char *port;
 	FILE *fd;
+	int stop;
 };
 
 static int jd_shutdown;
@@ -243,8 +244,11 @@ static void store_file(struct record_data *rec)
 	struct timespec ts;
 	uint64_t val;
 	unsigned int i;
+	int stop;
 
-	while (!READ_ONCE(jd_shutdown)) {
+	do {
+		/* One more pass after the workers have finished */
+		stop = __atomic_load_n(&rec->stop, __ATOMIC_ACQUIRE);
 		for (i = 0; i < num_threads; i++) {
 			sample.cpuid = i;
 			while (!ringbuffer_read(s[i].rb, &ts, &val)) {
@@ -254,8 +258,9 @@ static void store_file(struct record_data *rec)
 			}
 		}
 
-		usleep(DEFAULT_INTERVAL);
-	}
+		if (!stop)
+			usleep(DEFAULT_INTERVAL);
+	} while (!stop);
 }
 
 static void store_network(struct record_data *rec)
@@ -264,7 +269,7 @@ static void store_network(struct record_data *rec)
 	struct addrinfo hints, *res, *tmp;
 	struct sockaddr *sa;
 	socklen_t salen;
-	int err, sk, len;
+	int err, sk, len, stop;
 	unsigned int i, c;
 	struct stats *s = rec->stats;
 	struct timespec ts;
@@ -300,7 +305,8 @@ static void store_network(struct record_data *rec)
 		err_handler(errno, "fcntl");
 
 	c = 0;
-	while (!READ_ONCE(jd_shutdown)) {
+	do {
+		stop = __atomic_load_n(&rec->stop, __ATOMIC_ACQUIRE);
 		for (i = 0; i < num_threads; i++) {
 			while (!ringbuffer_read(s[i].rb, &ts, &val)) {
 				sp[c].cpuid = i;
@@ -317,7 +323,15 @@ static void store_network(struct record_data *rec)
 			}
 		}
 
-		usleep(DEFAULT_INTERVAL);
+		if (!stop)
+			usleep(DEFAULT_INTERVAL);
+	} while (!stop);
+
+	if (c) {
+		len = sendto(sk, (const void *)sp, c * sizeof(sp[0]), 0,
+			sa, salen);
+		if (len < 0)
+			perror("sendto");
 	}
 
 	close(sk);
@@ -754,6 +768,7 @@ int main(int argc, char *argv[])
 	stop_workload();
 
 	if (rec) {
+		__atomic_store_n(&rec->stop, 1, __ATOMIC_RELEASE);
 		err = pthread_join(iopid, NULL);
 		if (err)
 			err_handler(err, "pthread_join()");

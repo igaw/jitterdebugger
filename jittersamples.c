@@ -81,12 +81,12 @@ static void dump_samples(const char *port)
 
 	while (1) {
 		len = recvfrom(sk, sp, sizeof(sp), 0, NULL, NULL);
-		if (len != sizeof(sp)) {
+		if (len <= 0 || len % sizeof(sp[0])) {
 			warn_handler("UDP packet has wrong size\n");
 			continue;
 		}
-		wlen = fwrite(sp, sizeof(sp), 1, stdout);
-		if (wlen != 1)
+		wlen = fwrite(sp, 1, len, stdout);
+		if (wlen != (size_t)len)
 			err_handler(errno, "fwrite()");
 	}
 
